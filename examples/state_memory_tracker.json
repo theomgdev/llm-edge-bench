@@ -1,0 +1,186 @@
+{
+  "version": 2,
+  "id": "tpl_state",
+  "name": "5. Dynamic PIN & State Reversal [Advanced]",
+  "description": "Captures dynamic model output via named regex (?<code>\\d{4}) and interpolates {{$code}} into the subsequent prompt.",
+  "startId": "pick",
+  "nodes": {
+    "pick": {
+      "id": "pick",
+      "type": "prompt",
+      "title": "Pick Code",
+      "prompt": "Generate a secret 4-digit numeric code. Output only the 4 digits.",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 2,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvh9ifowivex",
+          "label": "captured 4 digits",
+          "to": "recall",
+          "condition": {
+            "type": "regex",
+            "value": "(?<code>\\b\\d{4}\\b)"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 80,
+        "y": 160
+      }
+    },
+    "recall": {
+      "id": "recall",
+      "type": "prompt",
+      "title": "Recall & Reverse",
+      "prompt": "A moment ago you picked code {{$code}}. Reverse those 4 digits now. Output only the reversed 4 digits.",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 2,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvh9ifowjhin",
+          "label": "correctly reversed {{$code}}",
+          "to": "done",
+          "condition": {
+            "type": "expr",
+            "value": "text.includes(String(vars.code || \"\").split(\"\").reverse().join(\"\"))"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvh9ifowk9i2",
+          "label": "repeated original {{$code}}",
+          "to": "failed_reversal",
+          "condition": {
+            "type": "contains",
+            "value": "{{$code}}"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 480,
+        "y": 160
+      }
+    },
+    "done": {
+      "id": "done",
+      "type": "end",
+      "title": "State Reversal Verified",
+      "prompt": "",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 25,
+      "tags": [],
+      "outcome": "pass",
+      "edges": [],
+      "ui": {
+        "x": 880,
+        "y": 80
+      }
+    },
+    "failed_reversal": {
+      "id": "failed_reversal",
+      "type": "end",
+      "title": "Reversal Failed",
+      "prompt": "",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": -10,
+      "tags": [],
+      "outcome": "fail",
+      "edges": [],
+      "ui": {
+        "x": 880,
+        "y": 240
+      }
+    }
+  },
+  "settings": {
+    "systemPrompt": "",
+    "memory": "isolated",
+    "historyTurns": 4,
+    "retryMemory": "keep",
+    "retryMemoryNote": "Your previous answer was not accepted.",
+    "trialCounter": {
+      "enabled": false,
+      "template": "[Attempt {{attempt}}/{{budget}}]",
+      "position": "prefix",
+      "skipFirst": true
+    },
+    "cacheBuster": {
+      "enabled": true,
+      "mode": "user"
+    },
+    "maxSteps": 40,
+    "maxMs": 600000,
+    "defaultMaxAttempts": 5,
+    "normalize": {
+      "thinking": true,
+      "markdown": false,
+      "lower": true,
+      "punctuation": false,
+      "trim": true,
+      "whitespace": true
+    },
+    "params": {
+      "temperature": 0.2
+    },
+    "allowExpr": true
+  }
+}

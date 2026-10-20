@@ -1,0 +1,240 @@
+{
+  "version": 2,
+  "id": "tpl_arithmetic",
+  "name": "3. Arithmetic Ladder & Loop-Back [Intermediate]",
+  "description": "Evaluates basic arithmetic; a failure on step 2 resets context and loops back to question 1.",
+  "startId": "q1",
+  "nodes": {
+    "q1": {
+      "id": "q1",
+      "type": "prompt",
+      "title": "2 + 2",
+      "prompt": "What is 2 + 2? Output only the final number.",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 4,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvh9ifov72ze",
+          "label": "= 4 (correct)",
+          "to": "q2",
+          "condition": {
+            "type": "numeric",
+            "op": "eq",
+            "value": 4
+          },
+          "score": 10,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvh9ifov8s5h",
+          "label": "!= 4 (wrong)",
+          "to": "qExplain",
+          "condition": {
+            "type": "numeric",
+            "op": "ne",
+            "value": 4
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 60,
+        "y": 160
+      }
+    },
+    "q2": {
+      "id": "q2",
+      "type": "prompt",
+      "title": "16 + 16",
+      "prompt": "Correct! Now what is 16 + 16? Output only the number.",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 3,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvh9ifov9t20",
+          "label": "= 32 (correct)",
+          "to": "passEnd",
+          "condition": {
+            "type": "numeric",
+            "op": "eq",
+            "value": 32
+          },
+          "score": 10,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvh9ifovazj6",
+          "label": "wrong -> back to q1",
+          "to": "q1",
+          "condition": {
+            "type": "always"
+          },
+          "score": -2,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": true
+        }
+      ],
+      "ui": {
+        "x": 500,
+        "y": 70
+      }
+    },
+    "qExplain": {
+      "id": "qExplain",
+      "type": "prompt",
+      "title": "Explain Reason",
+      "prompt": "You gave an unexpected answer. Explain your calculation step by step.",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 2,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvh9ifovb3az",
+          "label": "explanation received",
+          "to": "failEnd",
+          "condition": {
+            "type": "length",
+            "min": 20
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 500,
+        "y": 280
+      }
+    },
+    "passEnd": {
+      "id": "passEnd",
+      "type": "end",
+      "title": "Mastered",
+      "prompt": "",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 20,
+      "tags": [],
+      "outcome": "pass",
+      "edges": [],
+      "ui": {
+        "x": 920,
+        "y": 70
+      }
+    },
+    "failEnd": {
+      "id": "failEnd",
+      "type": "end",
+      "title": "Failed",
+      "prompt": "",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": -5,
+      "tags": [],
+      "outcome": "fail",
+      "edges": [],
+      "ui": {
+        "x": 920,
+        "y": 280
+      }
+    }
+  },
+  "settings": {
+    "systemPrompt": "",
+    "memory": "conversation",
+    "historyTurns": 4,
+    "retryMemory": "keep",
+    "retryMemoryNote": "Your previous answer was not accepted.",
+    "trialCounter": {
+      "enabled": false,
+      "template": "[Attempt {{attempt}}/{{budget}}]",
+      "position": "prefix",
+      "skipFirst": true
+    },
+    "cacheBuster": {
+      "enabled": true,
+      "mode": "user"
+    },
+    "maxSteps": 12,
+    "maxMs": 600000,
+    "defaultMaxAttempts": 5,
+    "normalize": {
+      "thinking": true,
+      "markdown": false,
+      "lower": true,
+      "punctuation": false,
+      "trim": true,
+      "whitespace": true
+    },
+    "params": {
+      "temperature": 0.2
+    }
+  }
+}

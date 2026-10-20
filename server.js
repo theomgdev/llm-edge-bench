@@ -1,15 +1,13 @@
 /**
- * server.js — statik dosya sunucusu + LLM proxy. Sıfır bağımlılık.
+ * server.js — static asset server + LLM gateway proxy. Zero external dependencies.
  *
- * Proxy iki iş yapar:
- *  1) CORS duvarını kaldırır (tarayıcıdan api.openai.com'a doğrudan POST çoğu
- *     sağlayıcıda engellidir).
- *  2) API anahtarını isteğe göre sunucuda tutar (--key ile verilirse tarayıcı
- *     anahtarı hiç görmez).
+ * The proxy serves two primary functions:
+ *  1) Eliminates browser CORS barriers (browsers block direct requests to most LLM endpoints).
+ *  2) Securely handles upstream API keys on the server side (via --key or ENV, keeping the browser blind to secrets).
  *
- * Kullanım:
- *   node server.js [--port 8787] [--base-url URL] [--key SECRET] [--open]
- *   Anahtar ortamdan da okunur: OPENAI_API_KEY / LLM_API_KEY
+ * Usage:
+ *   node server.js [--port 8787] [--host 127.0.0.1] [--base-url URL] [--key SECRET] [--open]
+ *   Keys are also read from environment: OPENAI_API_KEY / LLM_API_KEY
  */
 
 import http from 'node:http';
@@ -77,7 +75,7 @@ async function handleProxy(req, res) {
   for (const [k, v] of Object.entries(body.headers || {})) {
     if (typeof v === 'string' && /^[\w-]+$/.test(k)) headers[k.toLowerCase()] = v;
   }
-  // tarayıcının gönderdiği anahtar yoksa sunucudakini kullan
+  // If the browser did not pass a key, fall back to server-configured key
   const key = body.apiKey || SERVER_KEY;
   if (key) headers.authorization = `Bearer ${key}`;
 
@@ -195,14 +193,13 @@ function parseArgs(argv) {
 
 server.listen(PORT, HOST, () => {
   const url = `http://${HOST}:${PORT}`;
-  console.log(`\n  LLM Edge Bench  →  ${url}`);
-  console.log(`  proxy: POST ${url}/api/llm`);
-  if (SERVER_KEY) console.log('  API anahtarı sunucuda tutuluyor (tarayıcıya gitmez)');
-  if (SERVER_BASE) console.log(`  varsayılan baseUrl: ${SERVER_BASE}`);
+  console.log(`\n  🐴 LLM Edge Bench  →  ${url}`);
+  console.log(`  proxy endpoint: POST ${url}/api/llm`);
+  if (SERVER_KEY) console.log('  upstream key: configured on server (hidden from browser)');
+  if (SERVER_BASE) console.log(`  default baseUrl: ${SERVER_BASE}`);
   console.log('');
   if (args.open) {
-    // Kabuk yok: URL argüman dizisi olarak geçer, dolayısıyla --host/--port
-    // içindeki shell metakarakterleri yorumlanamaz.
+    // URL passed as arg array, so shell metacharacters cannot be injected
     import('node:child_process').then(({ spawn }) => {
       const [cmd, argv] = process.platform === 'win32'
         ? ['cmd', ['/c', 'start', '', url]]

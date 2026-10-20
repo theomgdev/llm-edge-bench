@@ -1,0 +1,201 @@
+{
+  "version": 2,
+  "id": "tpl_react_agent",
+  "name": "8. Simulated ReAct Tool Agent [Expert]",
+  "description": "Evaluates tool selection, parameter extraction via regex (?<city>...), synthetic observation injection, and downstream recommendation.",
+  "startId": "react_start",
+  "nodes": {
+    "react_start": {
+      "id": "react_start",
+      "type": "prompt",
+      "title": "User Query",
+      "prompt": "What is the weather in Tokyo right now and should I take an umbrella? Use your weather tool if needed.",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 3,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvh9ifowxzok",
+          "label": "called Action: weather[city]",
+          "to": "react_obs",
+          "condition": {
+            "type": "regex",
+            "value": "Action:\\s*weather\\[(?<city>[^\\]]+)\\]"
+          },
+          "score": 0,
+          "inject": "[Observation: Real-time sensor reading for {{$city}}: 8°C, heavy rain and wind gusting to 40km/h. Rain probability: 95%]",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvh9ifowyhns",
+          "label": "guessed without calling tool",
+          "to": "react_hallucinated",
+          "condition": {
+            "type": "contains",
+            "value": "Final:"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 80,
+        "y": 160
+      }
+    },
+    "react_obs": {
+      "id": "react_obs",
+      "type": "prompt",
+      "title": "Process Observation",
+      "prompt": "Based on the observation, synthesize your final response for the user starting with \"Final:\".",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 2,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvh9ifowz5vl",
+          "label": "synthesized umbrella advice",
+          "to": "react_pass",
+          "condition": {
+            "type": "allOf",
+            "values": [
+              "Final:",
+              "umbrella"
+            ]
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvh9ifow10z3q",
+          "label": "incomplete answer",
+          "to": "react_hallucinated",
+          "condition": {
+            "type": "always"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 500,
+        "y": 100
+      }
+    },
+    "react_pass": {
+      "id": "react_pass",
+      "type": "end",
+      "title": "Tool Call & Decision Validated",
+      "prompt": "",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 40,
+      "tags": [],
+      "outcome": "pass",
+      "edges": [],
+      "ui": {
+        "x": 920,
+        "y": 100
+      }
+    },
+    "react_hallucinated": {
+      "id": "react_hallucinated",
+      "type": "end",
+      "title": "Hallucinated Without Tool",
+      "prompt": "",
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": -20,
+      "tags": [],
+      "outcome": "fail",
+      "edges": [],
+      "ui": {
+        "x": 920,
+        "y": 260
+      }
+    }
+  },
+  "settings": {
+    "systemPrompt": "You are a ReAct assistant with access to tools. If you need current external facts, output: Action: weather[city]. When you have enough information, output: Final: <your answer>.",
+    "memory": "conversation",
+    "historyTurns": 4,
+    "retryMemory": "keep",
+    "retryMemoryNote": "Your previous answer was not accepted.",
+    "trialCounter": {
+      "enabled": false,
+      "template": "[Attempt {{attempt}}/{{budget}}]",
+      "position": "prefix",
+      "skipFirst": true
+    },
+    "cacheBuster": {
+      "enabled": true,
+      "mode": "user"
+    },
+    "maxSteps": 40,
+    "maxMs": 600000,
+    "defaultMaxAttempts": 5,
+    "normalize": {
+      "thinking": true,
+      "markdown": false,
+      "lower": true,
+      "punctuation": false,
+      "trim": true,
+      "whitespace": true
+    },
+    "params": {
+      "temperature": 0.2
+    }
+  },
+  "systemPrompt": "You are a ReAct assistant with access to tools. If you need current external facts, output: Action: weather[city]. When you have enough information, output: Final: <your answer>."
+}
