@@ -283,23 +283,15 @@ export class GraphView {
     const x = n?.ui?.x ?? 0;
     const y = n?.ui?.y ?? 0;
 
-    if (el) {
-      const port = el.querySelector(kind === 'out' ? '.port-out' : '.port-in');
-      if (port) {
-        // Exact pixel center of port socket relative to graph coordinates
-        const portX = kind === 'out' ? (x + el.offsetWidth - 1) : (x - 1);
-        const portY = y + port.offsetTop + port.offsetHeight / 2;
-        return { x: portX, y: portY };
-      }
-    }
+    // The ports are styled at `top: 50%; transform: translateY(-50%)`.
+    // That means the port circle's vertical center is EXACTLY at 50% of the node height.
+    const h = el ? el.offsetHeight : (n?.type === 'end' ? 135 : 154);
+    const w = el ? el.offsetWidth : (n?.type === 'end' ? 220 : 260);
 
-    // Precise fallback based on measured node dimensions
-    const width = n?.type === 'end' ? 220 : 260;
-    const portOffset = n?.type === 'end' ? 73 : 83;
-    return {
-      x: kind === 'out' ? x + width - 1 : x - 1,
-      y: y + portOffset,
-    };
+    const portX = kind === 'out' ? (x + w) : x;
+    const portY = y + Math.round(h / 2);
+
+    return { x: portX, y: portY };
   }
 
   #calcBezier(p1, p2) {
