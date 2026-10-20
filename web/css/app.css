@@ -36,8 +36,8 @@
   --edge-active: #5b7fff;
   --edge-taken: #2fd181;
 
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, Menlo, Consolas, monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, sans-serif;
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -51,10 +51,12 @@ html, body {
   background: var(--bg-app);
   color: var(--text-main);
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 13.5px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
@@ -177,8 +179,8 @@ html, body {
   border: none;
   outline: none;
   color: var(--text-main);
-  font-size: 12px;
-  font-family: var(--font-mono);
+  font-size: 13px;
+  font-family: var(--font-sans);
   padding: 0 10px;
   height: 100%;
   width: 100%;
@@ -479,9 +481,10 @@ html, body {
 }
 
 .node-title {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 14px;
   color: var(--text-main);
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -493,27 +496,28 @@ html, body {
 }
 
 .badge {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
+  letter-spacing: 0.02em;
 }
 .badge-attempts { background: rgba(91, 127, 255, 0.15); color: var(--color-primary); }
 .badge-pass { background: var(--color-success-bg); color: var(--color-success); }
 .badge-fail { background: var(--color-danger-bg); color: var(--color-danger); }
 
 .node-body {
-  padding: 10px 12px;
-  font-size: 12px;
-  color: var(--text-muted);
-  max-height: 72px;
+  padding: 8px 12px 12px 12px;
+  font-size: 13px;
+  color: #cbd5e1;
+  max-height: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-  line-height: 1.4;
+  line-height: 1.5;
   user-select: none;
 }
 
@@ -598,10 +602,11 @@ html, body {
 }
 .edge-label-group:hover .edge-label-bg { stroke: var(--color-primary); }
 .edge-label-text {
-  fill: var(--text-main);
-  font-size: 10px;
-  font-family: var(--font-mono);
+  fill: #f1f5f9;
+  font-size: 11px;
+  font-family: var(--font-sans);
   font-weight: 600;
+  letter-spacing: -0.01em;
   text-anchor: middle;
   dominant-baseline: central;
 }
@@ -676,14 +681,15 @@ html, body {
   border-radius: var(--radius-md);
   color: var(--text-main);
   padding: 8px 10px;
-  font-size: 12px;
-  font-family: inherit;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  line-height: 1.5;
   outline: none;
   transition: border-color 0.15s;
 }
 .form-group textarea {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
   min-height: 80px;
   resize: vertical;
 }
@@ -819,8 +825,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
 }
 
 .feed-empty {
@@ -848,36 +854,42 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .step-node-name { font-weight: 700; color: var(--text-main); }
 .step-attempt { color: var(--text-dim); margin-left: 6px; }
 
 .step-prompt {
-  color: var(--text-muted);
-  font-size: 11px;
+  color: #cbd5e1;
+  font-size: 12.5px;
+  line-height: 1.5;
   background: rgba(0,0,0,0.25);
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
   white-space: pre-wrap;
+  font-family: var(--font-sans);
 }
 
 .step-answer {
-  color: #fff;
-  font-size: 12px;
+  color: #ffffff;
+  font-size: 13.5px;
+  line-height: 1.5;
   white-space: pre-wrap;
   padding: 4px 0;
+  font-family: var(--font-sans);
 }
 
 .step-reasoning {
-  font-size: 10px;
-  color: var(--text-dim);
-  background: rgba(0,0,0,0.15);
-  padding: 4px 8px;
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.5;
+  background: rgba(0,0,0,0.2);
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
-  max-height: 48px;
+  max-height: 60px;
   overflow-y: auto;
+  font-family: var(--font-sans);
 }
 
 .step-evals {

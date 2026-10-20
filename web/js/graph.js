@@ -278,34 +278,62 @@ export class GraphView {
 
   // ---------------------------------------------------------------- Geometry
   #getPortPos(nodeId, kind) {
+    const el = this.nodeEls.get(nodeId);
     const n = this.flow?.nodes?.[nodeId];
     const x = n?.ui?.x ?? 0;
     const y = n?.ui?.y ?? 0;
+
+    if (el) {
+      const port = el.querySelector(kind === 'out' ? '.port-out' : '.port-in');
+      if (port) {
+        // Exact pixel center of port socket relative to graph coordinates
+        const portX = kind === 'out' ? (x + el.offsetWidth - 1) : (x - 1);
+        const portY = y + port.offsetTop + port.offsetHeight / 2;
+        return { x: portX, y: portY };
+      }
+    }
+
+    // Precise fallback based on measured node dimensions
     const width = n?.type === 'end' ? 220 : 260;
-    // approximate header + body height
-    const height = 110;
-    if (kind === 'out') return { x: x + width, y: y + height / 2 };
-    return { x, y: y + height / 2 };
+    const portOffset = n?.type === 'end' ? 73 : 83;
+    return {
+      x: kind === 'out' ? x + width - 1 : x - 1,
+      y: y + portOffset,
+    };
   }
 
   #calcBezier(p1, p2) {
-    const dx = Math.abs(p2.x - p1.x);
-    // Backward loop (cycle): route around the node
-    if (p2.x <= p1.x) {
-      const offset = Math.max(60, dx * 0.5 + 80);
-      const dy = p2.y - p1.y;
-      return `M ${p1.x} ${p1.y} C ${p1.x + offset} ${p1.y - 40}, ${p2.x - offset} ${p2.y - 40}, ${p2.x} ${p2.y}`;
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+
+    // Forward curve: smooth horizontal-to-horizontal cubic bezier (Blender / Unreal style)
+    if (dx >= 20) {
+      // Adaptive softness: scales with horizontal distance, with generous minimum
+      const offset = Math.max(50, Math.min(dx * 0.55, 320));
+      const c1x = p1.x + offset;
+      const c1y = p1.y;
+      const c2x = p2.x - offset;
+      const c2y = p2.y;
+      return `M ${p1.x} ${p1.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
     }
-    const c1x = p1.x + Math.max(40, dx * 0.45);
-    const c1y = p1.y;
-    const c2x = p2.x - Math.max(40, dx * 0.45);
-    const c2y = p2.y;
-    return `M ${p1.x} ${p1.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+
+    // Backward / Loop connection (dx < 20):
+    // Two smooth C1-continuous cubic curves passing through a rounded apex
+    const absDy = Math.abs(dy);
+    const loopX = Math.max(60, Math.min(140, Math.abs(dx) * 0.35 + 60));
+    const clearance = Math.max(50, 85 - absDy * 0.15);
+    const apexY = Math.min(p1.y, p2.y) - clearance;
+    const midX = (p1.x + p2.x) / 2;
+
+    return `M ${p1.x} ${p1.y} C ${p1.x + loopX} ${p1.y}, ${p1.x + loopX} ${apexY}, ${midX} ${apexY} C ${p2.x - loopX} ${apexY}, ${p2.x - loopX} ${p2.y}, ${p2.x} ${p2.y}`;
   }
 
   #calcMidpoint(p1, p2) {
-    if (p2.x <= p1.x) {
-      return { x: (p1.x + p2.x) / 2, y: Math.min(p1.y, p2.y) - 30 };
+    const dx = p2.x - p1.x;
+    if (dx < 20) {
+      const absDy = Math.abs(p2.y - p1.y);
+      const clearance = Math.max(50, 85 - absDy * 0.15);
+      return { x: (p1.x + p2.x) / 2, y: Math.min(p1.y, p2.y) - clearance };
     }
     return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
   }
