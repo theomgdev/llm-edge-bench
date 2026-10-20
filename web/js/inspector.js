@@ -215,6 +215,7 @@ export class InspectorView {
 
       <div class="form-row">
         ${!isStart ? `<button class="btn btn-sm btn-outline" id="btnMakeStart">Set as Start Node</button>` : '<span style="font-size:11px; color:var(--color-primary); font-weight:700;">★ Start Node</span>'}
+        ${!isEnd ? `<button class="btn btn-sm btn-ghost" id="btnResetNodeDefaults" title="Clear node overrides and inherit flow defaults">Reset Overrides</button>` : ''}
         <button class="btn btn-sm btn-danger" id="btnDeleteNode" style="margin-left:auto;">Delete Node</button>
       </div>
     `;
@@ -289,6 +290,22 @@ export class InspectorView {
       });
 
       this.#renderNodeEdgesList(node);
+    }
+
+    const resetNodeBtn = this.container.querySelector('#btnResetNodeDefaults');
+    if (resetNodeBtn) {
+      resetNodeBtn.addEventListener('click', () => {
+        node.memory = null;
+        node.retryMemory = null;
+        node.maxAttempts = null;
+        node.fallback = 'retry';
+        node.fallbackTarget = null;
+        node.onExhausted = 'stop';
+        node.onExhaustedTarget = null;
+        node.resetContextOnEnter = false;
+        this.onFlowMutated();
+        this.showNode(node.id);
+      });
     }
 
     const startBtn = this.container.querySelector('#btnMakeStart');
@@ -594,6 +611,40 @@ export class InspectorView {
     const flagsInput = container.querySelector('#cFlags');
     if (flagsInput) flagsInput.addEventListener('input', () => { c.flags = flagsInput.value; this.onFlowMutated(); });
 
+    // Live regex syntax validation
+    if (type === 'regex' && valInput) {
+      const validateRegex = () => {
+        const val = valInput.value.trim();
+        const fl = flagsInput ? flagsInput.value.trim() : 'i';
+        let hint = container.querySelector('#regexErrorHint');
+        if (!hint) {
+          hint = document.createElement('div');
+          hint.id = 'regexErrorHint';
+          hint.className = 'form-hint';
+          hint.style.marginTop = '4px';
+          valInput.parentNode.appendChild(hint);
+        }
+        if (!val) {
+          hint.textContent = '';
+          valInput.style.borderColor = '';
+          return;
+        }
+        try {
+          new RegExp(val, fl);
+          hint.textContent = '✓ Valid regular expression';
+          hint.style.color = 'var(--color-success)';
+          valInput.style.borderColor = 'var(--color-success)';
+        } catch (err) {
+          hint.textContent = `✗ ${err.message}`;
+          hint.style.color = 'var(--color-danger)';
+          valInput.style.borderColor = 'var(--color-danger)';
+        }
+      };
+      valInput.addEventListener('input', validateRegex);
+      if (flagsInput) flagsInput.addEventListener('input', validateRegex);
+      validateRegex();
+    }
+
     const caseCheck = container.querySelector('#cCase');
     if (caseCheck) caseCheck.addEventListener('change', () => { c.caseSensitive = caseCheck.checked; this.onFlowMutated(); });
 
@@ -741,6 +792,7 @@ export class InspectorView {
         </div>
       </div>
       <div class="modal-footer">
+        <button class="btn btn-outline" id="btnResetSettingsDefaults" style="margin-right:auto;" title="Restore benchmark recommended default values">Reset to Defaults</button>
         <button class="btn btn-primary" id="btnSaveFlowSettings">Save Settings</button>
       </div>
     `;

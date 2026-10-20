@@ -53,6 +53,7 @@
       </div>
       <div class="input-group">
         <input type="password" id="apiKey" placeholder="API key (optional for local)" spellcheck="false" autocomplete="off" />
+        <button class="btn btn-xs btn-ghost" id="btnToggleApiKey" title="Show/Hide API key" style="padding:0 8px; color:var(--text-dim);">👁</button>
       </div>
       <div class="input-group model-group">
         <input type="text" id="modelInput" value="agy/gemini-3.1-flash-lite" placeholder="model name" spellcheck="false" list="modelsDataList" />
@@ -130,7 +131,9 @@
 
       <!-- Canvas HUD Overlay -->
       <div class="canvas-hud">
-        <div class="hud-item" id="hudZoom">100%</div>
+        <button class="btn btn-xs btn-ghost hud-btn" id="btnZoomOut" title="Zoom out (−)" style="padding:0 6px; font-weight:700;">−</button>
+        <div class="hud-item" id="hudZoom" title="Click to reset to 100%" style="cursor:pointer; padding:0 4px;">100%</div>
+        <button class="btn btn-xs btn-ghost hud-btn" id="btnZoomIn" title="Zoom in (+)" style="padding:0 6px; font-weight:700;">+</button>
         <div class="hud-sep"></div>
         <div class="hud-item" id="hudNodeCount">0 nodes</div>
         <div class="hud-item" id="hudEdgeCount">0 edges</div>

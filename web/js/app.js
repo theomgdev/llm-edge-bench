@@ -80,8 +80,68 @@ class App {
     });
 
     this.#initEvents();
+    this.#initConsoleResize();
     this.#loadInitialFlow();
     this.#checkServerConfig();
+  }
+
+  duplicateSelectedNode() {
+    if (!this.graph.selectedNodeId) return;
+    const orig = this.flow.nodes[this.graph.selectedNodeId];
+    if (!orig) return;
+
+    const newId = `node_${Date.now().toString(36)}`;
+    const copy = JSON.parse(JSON.stringify(orig));
+    copy.id = newId;
+    copy.title = `${orig.title || 'Node'} (copy)`;
+    copy.ui = {
+      x: (orig.ui?.x ?? 100) + 40,
+      y: (orig.ui?.y ?? 100) + 40,
+    };
+    // Re-generate edge IDs to avoid duplicate IDs
+    copy.edges = (copy.edges || []).map((e) => ({
+      ...e,
+      id: `e_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
+    }));
+
+    this.flow.nodes[newId] = copy;
+    this.onFlowMutated();
+    this.graph.selectNode(newId);
+  }
+
+  #initConsoleResize() {
+    const drawer = document.getElementById('consoleDrawer');
+    const handle = document.getElementById('consoleHandle');
+    let isResizing = false;
+    let startY = 0;
+    let startH = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      // Don't drag if clicking buttons
+      if (e.target.closest('button')) return;
+      isResizing = true;
+      startY = e.clientY;
+      startH = drawer.offsetHeight;
+      drawer.style.transition = 'none'; // remove transition during drag
+      document.body.style.cursor = 'ns-resize';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const dy = startY - e.clientY;
+      const maxH = window.innerHeight * 0.82;
+      const minH = 42;
+      const newH = Math.max(minH, Math.min(maxH, startH + dy));
+      drawer.style.height = `${newH}px`;
+      drawer.classList.toggle('collapsed', newH <= 50);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!isResizing) return;
+      isResizing = false;
+      drawer.style.transition = '';
+      document.body.style.cursor = '';
+    });
   }
 
   openInspector() {
@@ -436,6 +496,37 @@ class App {
       const trialRow = this.modalCard.querySelector('#trialDetailsRow');
       trialCheck.addEventListener('change', () => { trialRow.style.display = trialCheck.checked ? 'flex' : 'none'; });
 
+      // Reset to canonical benchmark defaults
+      const resetBtn = this.modalCard.querySelector('#btnResetSettingsDefaults');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          const fresh = createFlow().settings;
+          this.modalCard.querySelector('#setSysPrompt').value = fresh.systemPrompt || '';
+          this.modalCard.querySelector('#setMemory').value = fresh.memory || 'conversation';
+          this.modalCard.querySelector('#setTurns').value = fresh.historyTurns ?? 4;
+          this.modalCard.querySelector('#setRetryMemory').value = fresh.retryMemory || 'keep';
+          this.modalCard.querySelector('#setDefaultAttempts').value = fresh.defaultMaxAttempts ?? 5;
+
+          trialCheck.checked = true; // recommended default
+          trialRow.style.display = 'flex';
+          this.modalCard.querySelector('#setTrialTemplate').value = '[Attempt {{attempt}}/{{budget}}]';
+          this.modalCard.querySelector('#setTrialPos').value = 'prefix';
+
+          this.modalCard.querySelector('#setCacheBuster').checked = true;
+
+          this.modalCard.querySelector('#normThinking').checked = true;
+          this.modalCard.querySelector('#normLower').checked = true;
+          this.modalCard.querySelector('#normMarkdown').checked = false;
+          this.modalCard.querySelector('#normTrim').checked = true;
+
+          this.modalCard.querySelector('#setMaxSteps').value = fresh.maxSteps ?? 40;
+          this.modalCard.querySelector('#setTemp').value = fresh.params?.temperature ?? 0.2;
+
+          resetBtn.textContent = '✓ Defaults Restored!';
+          setTimeout(() => { if (resetBtn) resetBtn.textContent = 'Reset to Defaults'; }, 1500);
+        });
+      }
+
       this.modalCard.querySelector('#btnSaveFlowSettings').addEventListener('click', () => {
         const s = this.flow.settings = this.flow.settings || {};
         s.systemPrompt = this.modalCard.querySelector('#setSysPrompt').value;
@@ -556,6 +647,30 @@ class App {
       toggleInspectorBtn.addEventListener('click', () => this.toggleInspector());
     }
 
+    // API key show/hide toggle
+    const toggleApiKeyBtn = document.getElementById('btnToggleApiKey');
+    if (toggleApiKeyBtn) {
+      toggleApiKeyBtn.addEventListener('click', () => {
+        const isPass = this.apiKey.type === 'password';
+        this.apiKey.type = isPass ? 'text' : 'password';
+        toggleApiKeyBtn.style.color = isPass ? 'var(--color-primary)' : 'var(--text-dim)';
+      });
+    }
+
+    // HUD Zoom controls
+    document.getElementById('btnZoomIn')?.addEventListener('click', () => {
+      this.graph.scale = Math.min(2.5, this.graph.scale * 1.15);
+      this.graph.render();
+    });
+    document.getElementById('btnZoomOut')?.addEventListener('click', () => {
+      this.graph.scale = Math.max(0.2, this.graph.scale * 0.85);
+      this.graph.render();
+    });
+    document.getElementById('hudZoom')?.addEventListener('click', () => {
+      this.graph.scale = 1.0;
+      this.graph.render();
+    });
+
     // Console controls
     document.getElementById('btnToggleDrawer').addEventListener('click', () => this.console.toggle());
     document.getElementById('consoleHandle').addEventListener('dblclick', () => this.console.toggle());
@@ -581,6 +696,13 @@ class App {
       // Don't intercept when typing in inputs/textareas
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      // Duplicate: Ctrl+D or Cmd+D
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        this.duplicateSelectedNode();
+        return;
+      }
 
       if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.addNode('prompt'); }
       else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); this.addNode('end'); }

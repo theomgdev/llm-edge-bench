@@ -116,7 +116,12 @@ export class ConsoleView {
 
       <div class="step-prompt">${escapeHtml(step.prompt || '')}</div>
 
-      ${step.answer ? `<div class="step-answer"><strong>Model:</strong> ${escapeHtml(step.answer)}</div>` : ''}
+      ${step.answer ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:2px;">
+          <div class="step-answer"><strong>Model:</strong> ${escapeHtml(step.answer)}</div>
+          <button class="btn btn-xs btn-ghost btn-copy-answer" title="Copy model output" style="padding:1px 6px; font-size:10px; color:var(--text-dim); flex-shrink:0;">📋 Copy</button>
+        </div>
+      ` : ''}
       ${step.error ? `<div class="step-answer" style="color:var(--color-danger);"><strong>Error:</strong> ${escapeHtml(step.error)}</div>` : ''}
 
       ${step.reasoning ? `<div class="step-reasoning"><strong>Thinking:</strong> ${escapeHtml(step.reasoning)}</div>` : ''}
@@ -129,6 +134,17 @@ export class ConsoleView {
         ${step.action?.startsWith('exhausted') ? `<span style="color:var(--color-danger);">✕ Attempt budget exhausted</span>` : ''}
       </div>
     `;
+
+    const copyBtn = card.querySelector('.btn-copy-answer');
+    if (copyBtn && step.answer) {
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(step.answer).then(() => {
+          copyBtn.textContent = '✓ Copied';
+          setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
+        });
+      });
+    }
 
     this.els.feed.appendChild(card);
     this.els.feed.scrollTop = this.els.feed.scrollHeight;
