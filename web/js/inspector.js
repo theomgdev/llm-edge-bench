@@ -11,12 +11,14 @@ export class InspectorView {
   /**
    * @param {HTMLElement} container
    * @param {HTMLElement} titleEl
+   * @param {HTMLElement} footerEl
    * @param {()=>void} onFlowMutated
    * @param {(targetId:string)=>void} onFocusNode
    */
-  constructor(container, titleEl, onFlowMutated, onFocusNode) {
+  constructor(container, titleEl, footerEl, onFlowMutated, onFocusNode) {
     this.container = container;
     this.titleEl = titleEl;
+    this.footerEl = footerEl;
     this.onFlowMutated = onFlowMutated;
     this.onFocusNode = onFocusNode;
     this.flow = null;
@@ -32,6 +34,10 @@ export class InspectorView {
     this.currentNodeId = null;
     this.currentEdge = null;
     this.titleEl.textContent = 'Flow Overview';
+    if (this.footerEl) {
+      this.footerEl.style.display = 'none';
+      this.footerEl.innerHTML = '';
+    }
 
     if (!this.flow) {
       this.container.innerHTML = '<div class="inspector-empty">No flow loaded.</div>';
@@ -210,15 +216,63 @@ export class InspectorView {
         <div class="edges-list" id="nodeEdgesList"></div>
       </div>
       ` : ''}
-
-      <div class="form-sep" style="height:1px; background:var(--border); margin:6px 0;"></div>
-
-      <div class="form-row">
-        ${!isStart ? `<button class="btn btn-sm btn-outline" id="btnMakeStart">Set as Start Node</button>` : '<span style="font-size:11px; color:var(--color-primary); font-weight:700;">★ Start Node</span>'}
-        ${!isEnd ? `<button class="btn btn-sm btn-ghost" id="btnResetNodeDefaults" title="Clear node overrides and inherit flow defaults">Reset Overrides</button>` : ''}
-        <button class="btn btn-sm btn-danger" id="btnDeleteNode" style="margin-left:auto;">Delete Node</button>
-      </div>
     `;
+
+    // Render footer action bar in dedicated bottom container
+    if (this.footerEl) {
+      this.footerEl.style.display = 'block';
+      this.footerEl.innerHTML = `
+        <div class="form-actions">
+          <div class="actions-left">
+            ${!isStart ? `<button class="btn btn-sm btn-outline" id="btnMakeStart">★ Make Start</button>` : '<span style="font-size:11px; color:var(--color-primary); font-weight:700; padding:0 4px;">★ Start Node</span>'}
+            ${!isEnd ? `<button class="btn btn-sm btn-outline" id="btnResetNodeDefaults" title="Clear node overrides and inherit flow defaults">Reset Overrides</button>` : ''}
+          </div>
+          <div class="actions-right">
+            <button class="btn btn-sm btn-danger" id="btnDeleteNode">Delete Node</button>
+          </div>
+        </div>
+      `;
+
+      const resetNodeBtn = this.footerEl.querySelector('#btnResetNodeDefaults');
+      if (resetNodeBtn) {
+        resetNodeBtn.addEventListener('click', () => {
+          node.memory = null;
+          node.retryMemory = null;
+          node.maxAttempts = null;
+          node.fallback = 'retry';
+          node.fallbackTarget = null;
+          node.onExhausted = 'stop';
+          node.onExhaustedTarget = null;
+          node.resetContextOnEnter = false;
+          this.onFlowMutated();
+          this.showNode(node.id);
+        });
+      }
+
+      const startBtn = this.footerEl.querySelector('#btnMakeStart');
+      if (startBtn) {
+        startBtn.addEventListener('click', () => {
+          this.flow.startId = node.id;
+          this.onFlowMutated();
+          this.showNode(node.id);
+        });
+      }
+
+      this.footerEl.querySelector('#btnDeleteNode')?.addEventListener('click', () => {
+        if (!confirm(`Delete node "${nodeLabel(node)}"?`)) return;
+        delete this.flow.nodes[node.id];
+        for (const n of Object.values(this.flow.nodes)) {
+          n.edges = (n.edges || []).filter((e) => e.to !== node.id);
+          if (n.fallbackTarget === node.id) n.fallbackTarget = null;
+          if (n.onExhaustedTarget === node.id) n.onExhaustedTarget = null;
+        }
+        if (this.flow.startId === node.id) {
+          this.flow.startId = Object.keys(this.flow.nodes)[0] || null;
+        }
+        this.onFlowMutated();
+        this.showEmpty();
+      });
+    }
 
     // Bind inputs
     const titleInput = this.container.querySelector('#nodeTitle');
@@ -291,47 +345,6 @@ export class InspectorView {
 
       this.#renderNodeEdgesList(node);
     }
-
-    const resetNodeBtn = this.container.querySelector('#btnResetNodeDefaults');
-    if (resetNodeBtn) {
-      resetNodeBtn.addEventListener('click', () => {
-        node.memory = null;
-        node.retryMemory = null;
-        node.maxAttempts = null;
-        node.fallback = 'retry';
-        node.fallbackTarget = null;
-        node.onExhausted = 'stop';
-        node.onExhaustedTarget = null;
-        node.resetContextOnEnter = false;
-        this.onFlowMutated();
-        this.showNode(node.id);
-      });
-    }
-
-    const startBtn = this.container.querySelector('#btnMakeStart');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => {
-        this.flow.startId = node.id;
-        this.onFlowMutated();
-        this.showNode(node.id);
-      });
-    }
-
-    this.container.querySelector('#btnDeleteNode').addEventListener('click', () => {
-      if (!confirm(`Delete node "${nodeLabel(node)}"?`)) return;
-      delete this.flow.nodes[node.id];
-      // remove edges pointing to this node
-      for (const n of Object.values(this.flow.nodes)) {
-        n.edges = (n.edges || []).filter((e) => e.to !== node.id);
-        if (n.fallbackTarget === node.id) n.fallbackTarget = null;
-        if (n.onExhaustedTarget === node.id) n.onExhaustedTarget = null;
-      }
-      if (this.flow.startId === node.id) {
-        this.flow.startId = Object.keys(this.flow.nodes)[0] || null;
-      }
-      this.onFlowMutated();
-      this.showEmpty();
-    });
   }
 
   #renderNodeEdgesList(node) {
@@ -436,14 +449,30 @@ export class InspectorView {
           <span>Wipe conversation history when taking this branch</span>
         </label>
       </div>
-
-      <div class="form-sep" style="height:1px; background:var(--border); margin:6px 0;"></div>
-
-      <div class="form-row">
-        <button class="btn btn-sm btn-outline" id="btnBackToNode">← Back to Node</button>
-        <button class="btn btn-sm btn-danger" id="btnDeleteEdge" style="margin-left:auto;">Delete Branch</button>
-      </div>
     `;
+
+    // Render edge action footer
+    if (this.footerEl) {
+      this.footerEl.style.display = 'block';
+      this.footerEl.innerHTML = `
+        <div class="form-actions">
+          <div class="actions-left">
+            <button class="btn btn-sm btn-outline" id="btnBackToNode">← Back to Node</button>
+          </div>
+          <div class="actions-right">
+            <button class="btn btn-sm btn-danger" id="btnDeleteEdge">Delete Branch</button>
+          </div>
+        </div>
+      `;
+
+      this.footerEl.querySelector('#btnBackToNode')?.addEventListener('click', () => this.showNode(fromNodeId));
+
+      this.footerEl.querySelector('#btnDeleteEdge')?.addEventListener('click', () => {
+        fromNode.edges = fromNode.edges.filter((e) => e.id !== edgeId);
+        this.onFlowMutated();
+        this.showNode(fromNodeId);
+      });
+    }
 
     // Bindings
     const targetSelect = this.container.querySelector('#edgeTarget');
@@ -474,14 +503,6 @@ export class InspectorView {
 
     const resetContextCheck = this.container.querySelector('#edgeResetContext');
     resetContextCheck.addEventListener('change', () => { edge.resetContext = resetContextCheck.checked; this.onFlowMutated(); });
-
-    this.container.querySelector('#btnBackToNode').addEventListener('click', () => this.showNode(fromNodeId));
-
-    this.container.querySelector('#btnDeleteEdge').addEventListener('click', () => {
-      fromNode.edges = fromNode.edges.filter((e) => e.id !== edgeId);
-      this.onFlowMutated();
-      this.showNode(fromNodeId);
-    });
 
     this.#renderCondDynamicFields(edge);
   }

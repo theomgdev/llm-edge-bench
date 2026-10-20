@@ -50,6 +50,7 @@ class App {
     this.inspector = new InspectorView(
       document.getElementById('inspectorBody'),
       document.getElementById('inspectorTitle'),
+      document.getElementById('inspectorFooter'),
       () => this.onFlowMutated(),
       (id) => this.graph.selectNode(id)
     );
