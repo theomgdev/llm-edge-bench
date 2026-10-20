@@ -1,0 +1,230 @@
+{
+  "version": 2,
+  "id": "tpl_dynamic_puzzle",
+  "name": "10. Dynamic Math Puzzle & Verifier [Expert]",
+  "description": "Code Node generates dynamic random operands; LLM solves the challenge; a second Code Node verifies accuracy and calculates error margin.",
+  "startId": "puzzle_gen",
+  "nodes": {
+    "puzzle_gen": {
+      "id": "puzzle_gen",
+      "type": "code",
+      "title": "Generate Dynamic Puzzle",
+      "prompt": "",
+      "code": "// Generate dynamic random operands\nconst a = Math.floor(Math.random() * 40) + 12;\nconst b = Math.floor(Math.random() * 40) + 12;\nvars.opA = a;\nvars.opB = b;\nvars.expectedProduct = a * b;\nreturn `Puzzle generated: ${a} * ${b} = ${vars.expectedProduct}`;",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvhbb9or177mw",
+          "label": "puzzle ready",
+          "to": "puzzle_solve",
+          "condition": {
+            "type": "always"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 80,
+        "y": 160
+      }
+    },
+    "puzzle_solve": {
+      "id": "puzzle_solve",
+      "type": "prompt",
+      "title": "Solve Multiplication",
+      "prompt": "Calculate the product of {{opA}} and {{opB}}. Output only the single numeric product.",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 2,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvhbb9or1881t",
+          "label": "verify solution",
+          "to": "puzzle_verify",
+          "condition": {
+            "type": "always"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 440,
+        "y": 160
+      }
+    },
+    "puzzle_verify": {
+      "id": "puzzle_verify",
+      "type": "code",
+      "title": "Verify Calculation",
+      "prompt": "",
+      "code": "const nums = lastAnswer.match(/\\d+/g);\nif (!nums) return \"NO_NUMBER_FOUND\";\nconst got = Number(nums[0]);\nconst expected = Number(vars.expectedProduct);\nif (got === expected) {\n  vars.accuracy = \"100%\";\n  return \"CORRECT_SOLUTION\";\n}\nvars.errorMargin = Math.abs(got - expected);\nreturn `INCORRECT_VALUE: got ${got}, expected ${expected}`;",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvhbb9or19psv",
+          "label": "= CORRECT_SOLUTION",
+          "to": "puzzle_pass",
+          "condition": {
+            "type": "equals",
+            "value": "CORRECT_SOLUTION"
+          },
+          "score": 40,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvhbb9or1aihv",
+          "label": "incorrect",
+          "to": "puzzle_fail",
+          "condition": {
+            "type": "always"
+          },
+          "score": -10,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 800,
+        "y": 160
+      }
+    },
+    "puzzle_pass": {
+      "id": "puzzle_pass",
+      "type": "end",
+      "title": "Puzzle Solved Accurately",
+      "prompt": "",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 40,
+      "tags": [],
+      "outcome": "pass",
+      "edges": [],
+      "ui": {
+        "x": 1160,
+        "y": 80
+      }
+    },
+    "puzzle_fail": {
+      "id": "puzzle_fail",
+      "type": "end",
+      "title": "Calculation Error",
+      "prompt": "",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": -10,
+      "tags": [],
+      "outcome": "fail",
+      "edges": [],
+      "ui": {
+        "x": 1160,
+        "y": 240
+      }
+    }
+  },
+  "settings": {
+    "systemPrompt": "",
+    "memory": "isolated",
+    "historyTurns": 4,
+    "retryMemory": "keep",
+    "retryMemoryNote": "Your previous answer was not accepted.",
+    "trialCounter": {
+      "enabled": false,
+      "template": "[Attempt {{attempt}}/{{budget}}]",
+      "position": "prefix",
+      "skipFirst": true
+    },
+    "cacheBuster": {
+      "enabled": true,
+      "mode": "user"
+    },
+    "maxSteps": 40,
+    "maxMs": 600000,
+    "defaultMaxAttempts": 5,
+    "normalize": {
+      "thinking": true,
+      "markdown": false,
+      "lower": true,
+      "punctuation": false,
+      "trim": true,
+      "whitespace": true
+    },
+    "params": {
+      "temperature": 0.2
+    },
+    "allowExpr": true
+  }
+}

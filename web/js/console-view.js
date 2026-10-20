@@ -96,6 +96,7 @@ export class ConsoleView {
     const isRetry = step.action === 'fallback:retry';
     const isError = step.type === 'error';
     const isSuccess = step.action === 'edge';
+    const isCode = step.type === 'code';
     card.className = `step-card ${isError ? 'error' : isRetry ? 'retry' : isSuccess ? 'success' : ''}`;
 
     const evalsHtml = (step.evaluations || [])
@@ -106,7 +107,7 @@ export class ConsoleView {
       <div class="step-card-header">
         <div>
           <span class="step-node-name">${escapeHtml(step.nodeTitle || step.nodeId)}</span>
-          <span class="step-attempt">attempt ${step.attempt || 1}</span>
+          <span class="step-attempt">${isCode ? '<span class="badge badge-code" style="margin-right:4px;">&lt;/&gt; CODE</span>' : ''}attempt ${step.attempt || 1}</span>
         </div>
         <div style="color:var(--text-dim); font-size:10px;">
           ${step.latencyMs ? `${step.latencyMs}ms` : ''}
@@ -114,12 +115,12 @@ export class ConsoleView {
         </div>
       </div>
 
-      <div class="step-prompt">${escapeHtml(step.prompt || '')}</div>
+      <div class="step-prompt" style="${isCode ? 'font-family:var(--font-mono); font-size:11px; white-space:pre-wrap; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);' : ''}">${escapeHtml(step.prompt || '')}</div>
 
       ${step.answer ? `
         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:2px;">
-          <div class="step-answer"><strong>Model:</strong> ${escapeHtml(step.answer)}</div>
-          <button class="btn btn-xs btn-ghost btn-copy-answer" title="Copy model output" style="padding:1px 6px; font-size:10px; color:var(--text-dim); flex-shrink:0;">📋 Copy</button>
+          <div class="step-answer"><strong>${isCode ? 'Output:' : 'Model:'}</strong> ${escapeHtml(step.answer)}</div>
+          <button class="btn btn-xs btn-ghost btn-copy-answer" title="Copy output" style="padding:1px 6px; font-size:10px; color:var(--text-dim); flex-shrink:0;">📋 Copy</button>
         </div>
       ` : ''}
       ${step.error ? `<div class="step-answer" style="color:var(--color-danger);"><strong>Error:</strong> ${escapeHtml(step.error)}</div>` : ''}

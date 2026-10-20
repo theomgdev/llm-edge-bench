@@ -1,0 +1,255 @@
+{
+  "version": 2,
+  "id": "tpl_code_unit_test",
+  "name": "9. Sandboxed Code Unit Testing [Expert]",
+  "description": "Model implements a Fibonacci algorithm; a Code Node executes 6 automated unit tests against it in a sandbox and routes failed tests to remediation.",
+  "startId": "code_prompt",
+  "nodes": {
+    "code_prompt": {
+      "id": "code_prompt",
+      "type": "prompt",
+      "title": "Write Fibonacci Function",
+      "prompt": "Write a JavaScript function `fibonacci(n)` that returns the n-th Fibonacci number (0-indexed: fib(0)=0, fib(1)=1, fib(2)=1, fib(3)=2, fib(5)=5, fib(10)=55). Output ONLY the executable JavaScript function declaration. Do not wrap in markdown.",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 3,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvhbb9or11fos",
+          "label": "evaluate with test suite",
+          "to": "code_test_runner",
+          "condition": {
+            "type": "always"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 80,
+        "y": 160
+      }
+    },
+    "code_test_runner": {
+      "id": "code_test_runner",
+      "type": "code",
+      "title": "Run Unit Test Suite",
+      "prompt": "",
+      "code": "// Sanitize and test the model's function declaration\nconst cleanCode = lastAnswer.replace(/^```\\w*|```$/g, '').trim();\ntry {\n  // eslint-disable-next-line no-new-func\n  const fn = new Function(`${cleanCode}; return typeof fibonacci === 'function' ? fibonacci : null;`)();\n  if (!fn) return \"ERROR: fibonacci function was not declared\";\n  const testCases = [\n    [0, 0], [1, 1], [2, 1], [3, 2], [5, 5], [10, 55]\n  ];\n  for (const [n, expected] of testCases) {\n    const got = fn(n);\n    if (got !== expected) {\n      vars.failedN = n;\n      vars.expectedVal = expected;\n      vars.gotVal = got;\n      return `FAIL: fib(${n}) returned ${got}, expected ${expected}`;\n    }\n  }\n  vars.testsPassed = 6;\n  return \"ALL_TESTS_PASSED\";\n} catch (err) {\n  return `SYNTAX_ERROR: ${err.message}`;\n}",
+      "timeoutMs": 3000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvhbb9or1223v",
+          "label": "= ALL_TESTS_PASSED",
+          "to": "unit_test_pass",
+          "condition": {
+            "type": "equals",
+            "value": "ALL_TESTS_PASSED"
+          },
+          "score": 50,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvhbb9or13xpn",
+          "label": "failed test -> remediate",
+          "to": "code_fix",
+          "condition": {
+            "type": "contains",
+            "value": "FAIL"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvhbb9or141gd",
+          "label": "syntax error -> remediate",
+          "to": "code_fix",
+          "condition": {
+            "type": "contains",
+            "value": "SYNTAX_ERROR"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        },
+        {
+          "id": "e_mvhbb9or15znc",
+          "label": "unhandled failure",
+          "to": "unit_test_fail",
+          "condition": {
+            "type": "always"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 480,
+        "y": 160
+      }
+    },
+    "code_fix": {
+      "id": "code_fix",
+      "type": "prompt",
+      "title": "Fix Failed Tests",
+      "prompt": "Your function did not pass unit testing: {{lastAnswer}}. Please correct the implementation and return the complete function.",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": 2,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 0,
+      "tags": [],
+      "outcome": null,
+      "edges": [
+        {
+          "id": "e_mvhbb9or1692v",
+          "label": "re-evaluate",
+          "to": "code_test_runner",
+          "condition": {
+            "type": "always"
+          },
+          "score": 0,
+          "inject": "",
+          "resetAttempts": true,
+          "resetContext": false
+        }
+      ],
+      "ui": {
+        "x": 480,
+        "y": 320
+      }
+    },
+    "unit_test_pass": {
+      "id": "unit_test_pass",
+      "type": "end",
+      "title": "Unit Tests Passed",
+      "prompt": "",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": 50,
+      "tags": [],
+      "outcome": "pass",
+      "edges": [],
+      "ui": {
+        "x": 880,
+        "y": 100
+      }
+    },
+    "unit_test_fail": {
+      "id": "unit_test_fail",
+      "type": "end",
+      "title": "Failed Unit Tests",
+      "prompt": "",
+      "timeoutMs": 5000,
+      "systemPrompt": null,
+      "params": null,
+      "maxAttempts": null,
+      "memory": null,
+      "historyTurns": null,
+      "retryMemory": null,
+      "trialCounter": null,
+      "resetContextOnEnter": false,
+      "fallback": "retry",
+      "fallbackTarget": null,
+      "onExhausted": "stop",
+      "onExhaustedTarget": null,
+      "score": -10,
+      "tags": [],
+      "outcome": "fail",
+      "edges": [],
+      "ui": {
+        "x": 880,
+        "y": 320
+      }
+    }
+  },
+  "settings": {
+    "systemPrompt": "",
+    "memory": "conversation",
+    "historyTurns": 4,
+    "retryMemory": "keep",
+    "retryMemoryNote": "Your previous answer was not accepted.",
+    "trialCounter": {
+      "enabled": false,
+      "template": "[Attempt {{attempt}}/{{budget}}]",
+      "position": "prefix",
+      "skipFirst": true
+    },
+    "cacheBuster": {
+      "enabled": true,
+      "mode": "user"
+    },
+    "maxSteps": 40,
+    "maxMs": 600000,
+    "defaultMaxAttempts": 5,
+    "normalize": {
+      "thinking": true,
+      "markdown": false,
+      "lower": true,
+      "punctuation": false,
+      "trim": true,
+      "whitespace": true
+    },
+    "params": {
+      "temperature": 0.2
+    },
+    "allowExpr": true
+  }
+}

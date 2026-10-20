@@ -14,7 +14,7 @@
 
 import { matchGroup, normalize, describeCondition } from './matchers.js';
 
-export const NODE_TYPES = ['prompt', 'end'];
+export const NODE_TYPES = ['prompt', 'code', 'end'];
 
 /** Default empty flow. Every setting is driven by the UI. */
 export function createFlow(partial = {}) {
@@ -69,6 +69,8 @@ export function createNode(partial = {}) {
     type: partial.type || 'prompt',
     title: partial.title || '',
     prompt: partial.prompt ?? '',
+    code: partial.code ?? (partial.type === 'code' ? 'return "OK";' : undefined),
+    timeoutMs: partial.timeoutMs ?? 5000,
     // Node-level overrides (null = inherit from flow)
     systemPrompt: partial.systemPrompt ?? null,
     params: partial.params || null,
@@ -158,7 +160,16 @@ export function validateFlow(flow) {
   for (const id of ids) {
     const n = flow.nodes[id];
     if (n.type === 'end') continue;
-    if (!String(n.prompt || '').trim()) warnings.push(`Node "${nodeLabel(n)}" has an empty prompt.`);
+    if (n.type === 'code') {
+      if (!String(n.code || '').trim()) warnings.push(`Node "${nodeLabel(n)}" has empty code.`);
+      try {
+        new Function('context', 'vars', 'history', 'lastAnswer', `"use strict"; ${n.code}`);
+      } catch (err) {
+        errors.push(`Node "${nodeLabel(n)}" has JavaScript syntax error: ${err.message}`);
+      }
+    } else {
+      if (!String(n.prompt || '').trim()) warnings.push(`Node "${nodeLabel(n)}" has an empty prompt.`);
+    }
     const seen = new Set();
     for (const e of n.edges || []) {
       if (!e.to) errors.push(`Node "${nodeLabel(n)}" has an edge with no target.`);
@@ -317,7 +328,129 @@ export async function runFlow(flow, client, opts = {}) {
 
       attempts[currentId] = (attempts[currentId] || 0) + 1;
       const attempt = attempts[currentId];
-      const budget = node.maxAttempts ?? s.defaultMaxAttempts ?? 5;
+      const budget = node.maxAttempts ?? (node.type === 'code' ? 1 : (s.defaultMaxAttempts ?? 5));
+
+      // Code Node execution
+      if (node.type === 'code') {
+        emit({ type: 'step:code', runId: run.id, nodeId: node.id, attempt, step: run.steps.length });
+        const stepStart = Date.now();
+        let rawAnswer = '';
+        let codeErr = null;
+        const codeTimeoutMs = Number(node.timeoutMs) || 5000;
+
+        try {
+          // Sandboxed JS execution of author script with context, vars, history, lastAnswer
+          // eslint-disable-next-line no-new-func
+          const fn = new Function('context', 'vars', 'history', 'lastAnswer', `
+            "use strict";
+            const { input, step, node, run } = context;
+            ${node.code}
+          `);
+          const ctx = {
+            input: vars.lastAnswer || '',
+            vars,
+            history,
+            lastAnswer: vars.lastAnswer || '',
+            node,
+            step: run.steps.length + 1,
+            run,
+          };
+          const execPromise = Promise.resolve(fn(ctx, vars, history, vars.lastAnswer || ''));
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Code execution exceeded timeout (${codeTimeoutMs}ms)`)), codeTimeoutMs)
+          );
+          const res = await Promise.race([execPromise, timeoutPromise]);
+          rawAnswer = typeof res === 'object' && res !== null ? JSON.stringify(res) : String(res ?? '');
+        } catch (err) {
+          codeErr = err;
+          rawAnswer = `[CODE ERROR] ${err.message}`;
+        }
+
+        const latencyMs = Date.now() - stepStart;
+        const normOpts = { ...(s.normalize || {}), ...(node.normalize || {}) };
+        const normAnswer = normalize(rawAnswer, normOpts);
+
+        // Always update lastAnswer so downstream nodes receive this code output
+        const ansTrim = rawAnswer.trim();
+        vars.lastAnswer = ansTrim;
+        vars.$lastAnswer = ansTrim;
+        vars.answer = ansTrim;
+        vars.$answer = ansTrim;
+        vars.prevNode = node.id;
+        vars.$prevNode = node.id;
+
+        // test outgoing edges in order
+        let taken = null;
+        const tried = [];
+        for (const edge of node.edges || []) {
+          const cond = prepCondition(edge.condition, true, vars);
+          const res = matchGroup(normAnswer, cond);
+          tried.push({ edgeId: edge.id, label: edge.label || describeCondition(edge.condition), ok: res.ok, detail: res.detail });
+          if (res.ok) { taken = { edge, res }; break; }
+        }
+
+        const step = {
+          index: run.steps.length,
+          nodeId: node.id,
+          nodeTitle: nodeLabel(node),
+          type: 'code',
+          attempt,
+          prompt: node.code,
+          answer: rawAnswer,
+          latencyMs,
+          triedEdges: tried,
+          matchedEdgeId: taken?.edge.id || null,
+          matchedLabel: taken ? (taken.edge.label || describeCondition(taken.edge.condition)) : null,
+          matchDetail: taken?.res.detail || null,
+          score: 0,
+          nextNodeId: null,
+          action: null,
+          error: codeErr ? codeErr.message : null,
+        };
+
+        if (taken) {
+          const { edge, res } = taken;
+          if (res.captures) Object.assign(vars, res.captures);
+          step.score = (Number(node.score) || 0) + (Number(edge.score) || 0);
+          run.score += step.score;
+          step.nextNodeId = edge.to;
+          step.action = 'edge';
+          if (edge.resetAttempts !== false) attempts[currentId] = 0;
+          if (edge.inject) pendingInject = interpolate(edge.inject, { ...vars, attempt: String(attempt) });
+          run.steps.push(step);
+          emit({ type: 'step:done', runId: run.id, step, edgeId: edge.id, nextNodeId: edge.to });
+          currentId = edge.to;
+          continue;
+        }
+
+        // no edge matched on code node
+        if (attempt >= budget) {
+          step.action = `exhausted:${node.onExhausted}`;
+          step.nextNodeId = node.onExhausted === 'goto' ? node.onExhaustedTarget : null;
+          run.steps.push(step);
+          emit({ type: 'step:done', runId: run.id, step, exhausted: true });
+          emit({ type: 'node:exhausted', runId: run.id, nodeId: node.id, attempts: attempt, budget });
+          if (node.onExhausted === 'goto' && node.onExhaustedTarget) {
+            attempts[currentId] = 0;
+            currentId = node.onExhaustedTarget;
+            continue;
+          }
+          run.status = 'done';
+          run.stopReason = `code node ${nodeLabel(node)} exhausted attempts (${budget})`;
+          break;
+        }
+
+        // fallback on code node
+        step.action = node.fallback === 'goto' ? 'fallback:goto' : 'fallback:retry';
+        step.nextNodeId = node.fallback === 'goto' ? node.fallbackTarget : node.id;
+        run.steps.push(step);
+        emit({ type: 'step:done', runId: run.id, step, fallback: true });
+        if (node.fallback === 'goto' && node.fallbackTarget) {
+          attempts[currentId] = 0;
+          currentId = node.fallbackTarget;
+        }
+        continue;
+      }
 
       // context reset requests
       if (resetNext || (node.resetContextOnEnter && attempt === 1)) {

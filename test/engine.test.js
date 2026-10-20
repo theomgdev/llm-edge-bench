@@ -459,6 +459,74 @@ await ta('engine: multi-turn state tracker captures named regex and interpolates
   assert.equal(run.vars.$code, '9876');
 });
 
+// ---------------------------------------------------------------- code nodes
+await ta('engine: code node executes JS, mutates vars, and branches on return value', async () => {
+  const client = new MockClient((messages) => 'def add(a, b): return a + b');
+  const flow = {
+    id: 'test_code_node',
+    startId: 'q_gen',
+    nodes: {
+      q_gen: {
+        id: 'q_gen',
+        type: 'prompt',
+        prompt: 'Write add function',
+        edges: [{ id: 'e1', to: 'code_verify', condition: { type: 'always' } }],
+      },
+      code_verify: {
+        id: 'code_verify',
+        type: 'code',
+        title: 'Run Unit Test',
+        code: `
+          vars.tested = true;
+          if (lastAnswer.includes('return a + b')) {
+            vars.score = 100;
+            return 'PASSED';
+          }
+          return 'FAILED';
+        `,
+        edges: [
+          { id: 'e2', to: 'pass_node', condition: { type: 'equals', value: 'PASSED' }, score: 50 },
+          { id: 'e3', to: 'fail_node', condition: { type: 'always' } },
+        ],
+      },
+      pass_node: { id: 'pass_node', type: 'end', outcome: 'pass', score: 10 },
+      fail_node: { id: 'fail_node', type: 'end', outcome: 'fail', score: 0 },
+    },
+  };
+
+  const run = await runFlow(flow, client);
+  assert.equal(run.status, 'done');
+  assert.equal(run.outcome, 'pass');
+  assert.equal(run.score, 60); // 50 (edge) + 10 (end node)
+  assert.equal(run.vars.tested, true);
+  assert.equal(run.vars.score, 100);
+  assert.equal(run.vars.lastAnswer, 'PASSED');
+});
+
+await ta('engine: code node handles execution error safely without crashing', async () => {
+  const flow = {
+    id: 'test_code_err',
+    startId: 'code_err_node',
+    nodes: {
+      code_err_node: {
+        id: 'code_err_node',
+        type: 'code',
+        code: 'throw new Error("Intentional sandbox test error");',
+        edges: [
+          { id: 'e_err', to: 'err_end', condition: { type: 'contains', value: 'Intentional sandbox' } },
+        ],
+      },
+      err_end: { id: 'err_end', type: 'end', outcome: 'fail', score: -10 },
+    },
+  };
+
+  const run = await runFlow(flow, new MockClient(() => ''));
+  assert.equal(run.status, 'done');
+  assert.equal(run.outcome, 'fail');
+  assert.equal(run.score, -10);
+  assert.ok(run.vars.lastAnswer.includes('[CODE ERROR]'));
+});
+
 // ---------------------------------------------------------------- batch run
 await ta('runBatch: 2 models x 3 repeats', async () => {
   const good = { label: 'good-model', client: new MockClient((m) => (m.at(-1).content.includes('16+16') ? '32' : '4')) };

@@ -15,6 +15,8 @@ export function getTemplates() {
     createCodeAuditFlow(),
     createAdversarialSafetyFlow(),
     createReActToolAgent(),
+    createCodeUnitTestRunner(),
+    createDynamicMathPuzzleFlow(),
   ];
 }
 
@@ -735,6 +737,254 @@ function createReActToolAgent() {
     settings: {
       systemPrompt: 'You are a ReAct assistant with access to tools. If you need current external facts, output: Action: weather[city]. When you have enough information, output: Final: <your answer>.',
       memory: 'conversation',
+    },
+  });
+}
+
+/**
+ * 9. [Expert] Sandboxed Code Unit Testing
+ * Model generates a JavaScript function fibonacci(n).
+ * A Code Node compiles the function in a sandbox and runs 6 automated unit tests.
+ * If tests fail, it extracts the exact failure and loops back to the model with remediation feedback.
+ */
+function createCodeUnitTestRunner() {
+  const qGen = createNode({
+    id: 'code_prompt',
+    title: 'Write Fibonacci Function',
+    prompt: 'Write a JavaScript function `fibonacci(n)` that returns the n-th Fibonacci number (0-indexed: fib(0)=0, fib(1)=1, fib(2)=1, fib(3)=2, fib(5)=5, fib(10)=55). Output ONLY the executable JavaScript function declaration. Do not wrap in markdown.',
+    maxAttempts: 3,
+    score: 0,
+    ui: { x: 80, y: 160 },
+  });
+
+  const nodeTestRunner = createNode({
+    id: 'code_test_runner',
+    type: 'code',
+    title: 'Run Unit Test Suite',
+    code: `// Sanitize and test the model's function declaration
+const cleanCode = lastAnswer.replace(/^\`\`\`\\w*|\`\`\`$/g, '').trim();
+try {
+  // eslint-disable-next-line no-new-func
+  const fn = new Function(\`\${cleanCode}; return typeof fibonacci === 'function' ? fibonacci : null;\`)();
+  if (!fn) return "ERROR: fibonacci function was not declared";
+  const testCases = [
+    [0, 0], [1, 1], [2, 1], [3, 2], [5, 5], [10, 55]
+  ];
+  for (const [n, expected] of testCases) {
+    const got = fn(n);
+    if (got !== expected) {
+      vars.failedN = n;
+      vars.expectedVal = expected;
+      vars.gotVal = got;
+      return \`FAIL: fib(\${n}) returned \${got}, expected \${expected}\`;
+    }
+  }
+  vars.testsPassed = 6;
+  return "ALL_TESTS_PASSED";
+} catch (err) {
+  return \`SYNTAX_ERROR: \${err.message}\`;
+}`,
+    timeoutMs: 3000,
+    score: 0,
+    ui: { x: 480, y: 160 },
+  });
+
+  const qRemediate = createNode({
+    id: 'code_fix',
+    title: 'Fix Failed Tests',
+    prompt: 'Your function did not pass unit testing: {{lastAnswer}}. Please correct the implementation and return the complete function.',
+    maxAttempts: 2,
+    score: 0,
+    ui: { x: 480, y: 320 },
+  });
+
+  const passEnd = createNode({
+    id: 'unit_test_pass',
+    type: 'end',
+    title: 'Unit Tests Passed',
+    outcome: 'pass',
+    score: 50,
+    ui: { x: 880, y: 100 },
+  });
+
+  const failEnd = createNode({
+    id: 'unit_test_fail',
+    type: 'end',
+    title: 'Failed Unit Tests',
+    outcome: 'fail',
+    score: -10,
+    ui: { x: 880, y: 320 },
+  });
+
+  qGen.edges = [
+    createEdge({
+      label: 'evaluate with test suite',
+      to: 'code_test_runner',
+      condition: { type: 'always' },
+    }),
+  ];
+
+  nodeTestRunner.edges = [
+    createEdge({
+      label: '= ALL_TESTS_PASSED',
+      to: 'unit_test_pass',
+      score: 50,
+      condition: { type: 'equals', value: 'ALL_TESTS_PASSED' },
+    }),
+    createEdge({
+      label: 'failed test -> remediate',
+      to: 'code_fix',
+      condition: { type: 'contains', value: 'FAIL' },
+    }),
+    createEdge({
+      label: 'syntax error -> remediate',
+      to: 'code_fix',
+      condition: { type: 'contains', value: 'SYNTAX_ERROR' },
+    }),
+    createEdge({
+      label: 'unhandled failure',
+      to: 'unit_test_fail',
+      condition: { type: 'always' },
+    }),
+  ];
+
+  qRemediate.edges = [
+    createEdge({
+      label: 're-evaluate',
+      to: 'code_test_runner',
+      condition: { type: 'always' },
+    }),
+  ];
+
+  return createFlow({
+    id: 'tpl_code_unit_test',
+    name: '9. Sandboxed Code Unit Testing [Expert]',
+    description: 'Model implements a Fibonacci algorithm; a Code Node executes 6 automated unit tests against it in a sandbox and routes failed tests to remediation.',
+    startId: 'code_prompt',
+    nodes: {
+      code_prompt: qGen,
+      code_test_runner: nodeTestRunner,
+      code_fix: qRemediate,
+      unit_test_pass: passEnd,
+      unit_test_fail: failEnd,
+    },
+    settings: {
+      memory: 'conversation',
+      allowExpr: true,
+    },
+  });
+}
+
+/**
+ * 10. [Expert] Dynamic Math Puzzle & Hash Verifier
+ * Code Node dynamically generates random operands (a, b) and calculates expected product.
+ * Prompt asks model to solve product of {{opA}} and {{opB}}.
+ * Second Code Node parses the answer, verifies against vars.expectedProduct, and computes accuracy metrics.
+ */
+function createDynamicMathPuzzleFlow() {
+  const nodeGenerator = createNode({
+    id: 'puzzle_gen',
+    type: 'code',
+    title: 'Generate Dynamic Puzzle',
+    code: `// Generate dynamic random operands
+const a = Math.floor(Math.random() * 40) + 12;
+const b = Math.floor(Math.random() * 40) + 12;
+vars.opA = a;
+vars.opB = b;
+vars.expectedProduct = a * b;
+return \`Puzzle generated: \${a} * \${b} = \${vars.expectedProduct}\`;`,
+    ui: { x: 80, y: 160 },
+  });
+
+  const qSolve = createNode({
+    id: 'puzzle_solve',
+    title: 'Solve Multiplication',
+    prompt: 'Calculate the product of {{opA}} and {{opB}}. Output only the single numeric product.',
+    maxAttempts: 2,
+    ui: { x: 440, y: 160 },
+  });
+
+  const nodeVerifier = createNode({
+    id: 'puzzle_verify',
+    type: 'code',
+    title: 'Verify Calculation',
+    code: `const nums = lastAnswer.match(/\\d+/g);
+if (!nums) return "NO_NUMBER_FOUND";
+const got = Number(nums[0]);
+const expected = Number(vars.expectedProduct);
+if (got === expected) {
+  vars.accuracy = "100%";
+  return "CORRECT_SOLUTION";
+}
+vars.errorMargin = Math.abs(got - expected);
+return \`INCORRECT_VALUE: got \${got}, expected \${expected}\`;`,
+    ui: { x: 800, y: 160 },
+  });
+
+  const passEnd = createNode({
+    id: 'puzzle_pass',
+    type: 'end',
+    title: 'Puzzle Solved Accurately',
+    outcome: 'pass',
+    score: 40,
+    ui: { x: 1160, y: 80 },
+  });
+
+  const failEnd = createNode({
+    id: 'puzzle_fail',
+    type: 'end',
+    title: 'Calculation Error',
+    outcome: 'fail',
+    score: -10,
+    ui: { x: 1160, y: 240 },
+  });
+
+  nodeGenerator.edges = [
+    createEdge({
+      label: 'puzzle ready',
+      to: 'puzzle_solve',
+      condition: { type: 'always' },
+    }),
+  ];
+
+  qSolve.edges = [
+    createEdge({
+      label: 'verify solution',
+      to: 'puzzle_verify',
+      condition: { type: 'always' },
+    }),
+  ];
+
+  nodeVerifier.edges = [
+    createEdge({
+      label: '= CORRECT_SOLUTION',
+      to: 'puzzle_pass',
+      score: 40,
+      condition: { type: 'equals', value: 'CORRECT_SOLUTION' },
+    }),
+    createEdge({
+      label: 'incorrect',
+      to: 'puzzle_fail',
+      score: -10,
+      condition: { type: 'always' },
+    }),
+  ];
+
+  return createFlow({
+    id: 'tpl_dynamic_puzzle',
+    name: '10. Dynamic Math Puzzle & Verifier [Expert]',
+    description: 'Code Node generates dynamic random operands; LLM solves the challenge; a second Code Node verifies accuracy and calculates error margin.',
+    startId: 'puzzle_gen',
+    nodes: {
+      puzzle_gen: nodeGenerator,
+      puzzle_solve: qSolve,
+      puzzle_verify: nodeVerifier,
+      puzzle_pass: passEnd,
+      puzzle_fail: failEnd,
+    },
+    settings: {
+      memory: 'isolated',
+      allowExpr: true,
     },
   });
 }

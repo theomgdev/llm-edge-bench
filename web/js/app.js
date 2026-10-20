@@ -229,13 +229,15 @@ class App {
     const center = this.graph.clientToGraph(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
     const isEnd = type === 'end';
+    const isCode = type === 'code';
     const node = createNode({
       id,
       type,
-      title: isEnd ? 'Outcome' : 'New Question',
-      prompt: isEnd ? 'Terminal outcome note.' : 'Ask a question here...',
+      title: isEnd ? 'Outcome' : isCode ? 'Code Script' : 'New Question',
+      prompt: isEnd ? 'Terminal outcome note.' : isCode ? '' : 'Ask a question here...',
+      code: isCode ? '// JavaScript script with access to vars, history, lastAnswer\n// Return a string or mutate vars\nreturn "VALID";' : undefined,
       outcome: isEnd ? 'pass' : null,
-      maxAttempts: isEnd ? null : 3,
+      maxAttempts: isEnd ? null : isCode ? 1 : 3,
       ui: { x: Math.round(center.x - 130), y: Math.round(center.y - 50) },
     });
 
@@ -478,11 +480,12 @@ class App {
     });
 
     // Toolbar actions
-    document.getElementById('toolAddPrompt').addEventListener('click', () => this.addNode('prompt'));
-    document.getElementById('toolAddEnd').addEventListener('click', () => this.addNode('end'));
-    document.getElementById('toolAutoLayout').addEventListener('click', () => this.graph.autoLayout());
-    document.getElementById('toolFitView').addEventListener('click', () => this.graph.fitView());
-    document.getElementById('toolValidate').addEventListener('click', () => {
+    document.getElementById('toolAddPrompt')?.addEventListener('click', () => this.addNode('prompt'));
+    document.getElementById('toolAddCode')?.addEventListener('click', () => this.addNode('code'));
+    document.getElementById('toolAddEnd')?.addEventListener('click', () => this.addNode('end'));
+    document.getElementById('toolAutoLayout')?.addEventListener('click', () => this.graph.autoLayout());
+    document.getElementById('toolFitView')?.addEventListener('click', () => this.graph.fitView());
+    document.getElementById('toolValidate')?.addEventListener('click', () => {
       const v = validateFlow(this.flow);
       if (v.ok && !v.warnings.length) {
         alert('Flow audit passed with zero errors or warnings!');
@@ -494,91 +497,18 @@ class App {
         alert(msg);
       }
     });
-    document.getElementById('toolToggleConsole').addEventListener('click', () => this.console.toggle());
+    document.getElementById('toolToggleConsole')?.addEventListener('click', () => this.console.toggle());
 
     // Top actions
-    this.btnRun.addEventListener('click', () => this.runCurrentFlow());
-    this.btnStop.addEventListener('click', () => this.stopCurrentRun());
-    document.getElementById('btnBatchModal').addEventListener('click', () => this.showBatchModal());
+    this.btnRun?.addEventListener('click', () => this.runCurrentFlow());
+    this.btnStop?.addEventListener('click', () => this.stopCurrentRun());
+    document.getElementById('btnBatchModal')?.addEventListener('click', () => this.showBatchModal());
 
     // Flow Settings Modal
-    document.getElementById('btnFlowSettings').addEventListener('click', () => {
-      this.modalBackdrop.style.display = 'grid';
-      this.modalCard.innerHTML = this.inspector.renderFlowSettingsModal();
-
-      const modalClose = this.modalCard.querySelector('#modalClose');
-      modalClose.addEventListener('click', () => { this.modalBackdrop.style.display = 'none'; });
-
-      const trialCheck = this.modalCard.querySelector('#setTrialEnabled');
-      const trialRow = this.modalCard.querySelector('#trialDetailsRow');
-      trialCheck.addEventListener('change', () => { trialRow.style.display = trialCheck.checked ? 'flex' : 'none'; });
-
-      // Reset to canonical benchmark defaults
-      const resetBtn = this.modalCard.querySelector('#btnResetSettingsDefaults');
-      if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-          const fresh = createFlow().settings;
-          this.modalCard.querySelector('#setSysPrompt').value = fresh.systemPrompt || '';
-          this.modalCard.querySelector('#setMemory').value = fresh.memory || 'conversation';
-          this.modalCard.querySelector('#setTurns').value = fresh.historyTurns ?? 4;
-          this.modalCard.querySelector('#setRetryMemory').value = fresh.retryMemory || 'keep';
-          this.modalCard.querySelector('#setDefaultAttempts').value = fresh.defaultMaxAttempts ?? 5;
-
-          trialCheck.checked = true; // recommended default
-          trialRow.style.display = 'flex';
-          this.modalCard.querySelector('#setTrialTemplate').value = '[Attempt {{attempt}}/{{budget}}]';
-          this.modalCard.querySelector('#setTrialPos').value = 'prefix';
-
-          this.modalCard.querySelector('#setCacheBuster').checked = true;
-
-          this.modalCard.querySelector('#normThinking').checked = true;
-          this.modalCard.querySelector('#normLower').checked = true;
-          this.modalCard.querySelector('#normMarkdown').checked = false;
-          this.modalCard.querySelector('#normTrim').checked = true;
-
-          this.modalCard.querySelector('#setMaxSteps').value = fresh.maxSteps ?? 40;
-          this.modalCard.querySelector('#setTemp').value = fresh.params?.temperature ?? 0.2;
-
-          resetBtn.textContent = '✓ Defaults Restored!';
-          setTimeout(() => { if (resetBtn) resetBtn.textContent = 'Reset to Defaults'; }, 1500);
-        });
-      }
-
-      this.modalCard.querySelector('#btnSaveFlowSettings').addEventListener('click', () => {
-        const s = this.flow.settings = this.flow.settings || {};
-        s.systemPrompt = this.modalCard.querySelector('#setSysPrompt').value;
-        s.memory = this.modalCard.querySelector('#setMemory').value;
-        s.historyTurns = Number(this.modalCard.querySelector('#setTurns').value);
-        s.retryMemory = this.modalCard.querySelector('#setRetryMemory').value;
-        s.defaultMaxAttempts = Number(this.modalCard.querySelector('#setDefaultAttempts').value);
-
-        s.trialCounter = {
-          enabled: trialCheck.checked,
-          template: this.modalCard.querySelector('#setTrialTemplate').value,
-          position: this.modalCard.querySelector('#setTrialPos').value,
-          skipFirst: true,
-        };
-
-        s.cacheBuster = {
-          enabled: this.modalCard.querySelector('#setCacheBuster').checked,
-          mode: 'user',
-        };
-
-        s.normalize = {
-          thinking: this.modalCard.querySelector('#normThinking').checked,
-          lower: this.modalCard.querySelector('#normLower').checked,
-          markdown: this.modalCard.querySelector('#normMarkdown').checked,
-          trim: this.modalCard.querySelector('#normTrim').checked,
-          whitespace: true,
-        };
-
-        s.maxSteps = Number(this.modalCard.querySelector('#setMaxSteps').value);
-        s.params = s.params || {};
-        s.params.temperature = Number(this.modalCard.querySelector('#setTemp').value);
-
-        this.onFlowMutated();
-        this.modalBackdrop.style.display = 'none';
-      });
+    document.getElementById('btnFlowSettings')?.addEventListener('click', () => this.openFlowSettingsModal());
+    document.getElementById('btnMenuFlowSettings')?.addEventListener('click', () => {
+      document.getElementById('flowActionsMenu')?.classList.remove('open');
+      this.openFlowSettingsModal();
     });
 
     // My Flows Button & Menu Item
@@ -743,6 +673,7 @@ class App {
       }
 
       if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.addNode('prompt'); }
+      else if ((e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); this.addNode('code'); }
       else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); this.addNode('end'); }
       else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.graph.fitView(); }
       else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); this.console.toggle(); }
@@ -796,6 +727,86 @@ class App {
     this.modalCard.className = 'modal-card';
   }
 
+  openFlowSettingsModal() {
+    this.modalBackdrop.style.display = 'grid';
+    this.modalCard.className = 'modal-card';
+    this.modalCard.innerHTML = this.inspector.renderFlowSettingsModal();
+
+    const modalClose = this.modalCard.querySelector('#modalClose');
+    modalClose?.addEventListener('click', () => { this.closeModal(); });
+
+    const trialCheck = this.modalCard.querySelector('#setTrialEnabled');
+    const trialRow = this.modalCard.querySelector('#trialDetailsRow');
+    trialCheck?.addEventListener('change', () => { trialRow.style.display = trialCheck.checked ? 'flex' : 'none'; });
+
+    // Reset to canonical benchmark defaults
+    const resetBtn = this.modalCard.querySelector('#btnResetSettingsDefaults');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        const fresh = createFlow().settings;
+        this.modalCard.querySelector('#setSysPrompt').value = fresh.systemPrompt || '';
+        this.modalCard.querySelector('#setMemory').value = fresh.memory || 'conversation';
+        this.modalCard.querySelector('#setTurns').value = fresh.historyTurns ?? 4;
+        this.modalCard.querySelector('#setRetryMemory').value = fresh.retryMemory || 'keep';
+        this.modalCard.querySelector('#setDefaultAttempts').value = fresh.defaultMaxAttempts ?? 5;
+
+        trialCheck.checked = true; // recommended default
+        trialRow.style.display = 'flex';
+        this.modalCard.querySelector('#setTrialTemplate').value = '[Attempt {{attempt}}/{{budget}}]';
+        this.modalCard.querySelector('#setTrialPos').value = 'prefix';
+
+        this.modalCard.querySelector('#setCacheBuster').checked = true;
+
+        this.modalCard.querySelector('#normThinking').checked = true;
+        this.modalCard.querySelector('#normLower').checked = true;
+        this.modalCard.querySelector('#normMarkdown').checked = false;
+        this.modalCard.querySelector('#normTrim').checked = true;
+
+        this.modalCard.querySelector('#setMaxSteps').value = fresh.maxSteps ?? 40;
+        this.modalCard.querySelector('#setTemp').value = fresh.params?.temperature ?? 0.2;
+
+        resetBtn.textContent = '✓ Defaults Restored!';
+        setTimeout(() => { if (resetBtn) resetBtn.textContent = 'Reset to Defaults'; }, 1500);
+      });
+    }
+
+    this.modalCard.querySelector('#btnSaveFlowSettings')?.addEventListener('click', () => {
+      const s = this.flow.settings = this.flow.settings || {};
+      s.systemPrompt = this.modalCard.querySelector('#setSysPrompt').value;
+      s.memory = this.modalCard.querySelector('#setMemory').value;
+      s.historyTurns = Number(this.modalCard.querySelector('#setTurns').value);
+      s.retryMemory = this.modalCard.querySelector('#setRetryMemory').value;
+      s.defaultMaxAttempts = Number(this.modalCard.querySelector('#setDefaultAttempts').value);
+
+      s.trialCounter = {
+        enabled: trialCheck.checked,
+        template: this.modalCard.querySelector('#setTrialTemplate').value,
+        position: this.modalCard.querySelector('#setTrialPos').value,
+        skipFirst: true,
+      };
+
+      s.cacheBuster = {
+        enabled: this.modalCard.querySelector('#setCacheBuster').checked,
+        mode: 'user',
+      };
+
+      s.normalize = {
+        thinking: this.modalCard.querySelector('#normThinking').checked,
+        lower: this.modalCard.querySelector('#normLower').checked,
+        markdown: this.modalCard.querySelector('#normMarkdown').checked,
+        trim: this.modalCard.querySelector('#normTrim').checked,
+        whitespace: true,
+      };
+
+      s.maxSteps = Number(this.modalCard.querySelector('#setMaxSteps').value);
+      s.params = s.params || {};
+      s.params.temperature = Number(this.modalCard.querySelector('#setTemp').value);
+
+      this.onFlowMutated();
+      this.closeModal();
+    });
+  }
+
   openMyFlowsModal() {
     this.modalCard.className = 'modal-card modal-card-lg';
     this.modalCard.innerHTML = `
@@ -841,7 +852,7 @@ class App {
         <div class="flow-lib-grid">
           ${flows.map((f) => {
             const isActive = this.flow && this.flow.id === f.id;
-            const dateStr = new Date(f.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+            const dateStr = new Date(f.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + new Date(f.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             return `
               <div class="flow-lib-card ${isActive ? 'active-flow' : ''}" data-flow-id="${escapeHtml(f.id)}">
                 <div class="flow-lib-header">

@@ -60,15 +60,15 @@ async function handleProxy(req, res) {
   try {
     body = JSON.parse(await readBody(req, 8 * 1024 * 1024));
   } catch (err) {
-    return json(res, 400, { error: `gövde çözülemedi: ${err.message}` });
+    return json(res, 400, { error: `invalid request body: ${err.message}` });
   }
 
   const baseUrl = String(body.baseUrl || SERVER_BASE || '').replace(/\/+$/, '');
-  if (!baseUrl) return json(res, 400, { error: 'baseUrl gerekli' });
-  if (!/^https?:\/\//i.test(baseUrl)) return json(res, 400, { error: 'baseUrl http(s) olmalı' });
+  if (!baseUrl) return json(res, 400, { error: 'baseUrl is required' });
+  if (!/^https?:\/\//i.test(baseUrl)) return json(res, 400, { error: 'baseUrl must be http or https' });
 
   const subPath = String(body.path || '/chat/completions');
-  if (!subPath.startsWith('/')) return json(res, 400, { error: 'path / ile başlamalı' });
+  if (!subPath.startsWith('/')) return json(res, 400, { error: 'path must start with /' });
 
   const target = baseUrl + subPath;
   const headers = { 'content-type': 'application/json', accept: 'application/json' };
@@ -106,7 +106,7 @@ async function handleProxy(req, res) {
     const aborted = err.name === 'AbortError';
     if (!res.headersSent) {
       json(res, aborted ? 504 : 502, {
-        error: aborted ? `yukarı akış zaman aşımı (${timeoutMs}ms)` : `yukarı akışa ulaşılamadı: ${err.message}`,
+        error: aborted ? `upstream timeout (${timeoutMs}ms)` : `upstream connection failed: ${err.message}`,
         target: baseUrl,
       });
     }
@@ -122,7 +122,7 @@ async function listExamples(res) {
       try {
         const flow = JSON.parse(await fsp.readFile(path.join(dir, f), 'utf8'));
         out.push({ file: f, id: flow.id, name: flow.name, description: flow.description, nodeCount: Object.keys(flow.nodes || {}).length, flow });
-      } catch { /* bozuk örnek listeyi düşürmez */ }
+      } catch { /* skip corrupted example files */ }
     }
     return json(res, 200, { examples: out });
   } catch {
@@ -133,7 +133,7 @@ async function listExamples(res) {
 async function serveStatic(pathname, res) {
   let rel = decodeURIComponent(pathname);
   if (rel === '/' || rel === '') rel = '/index.html';
-  // core/ klasörü web kökünün dışında; tarayıcıya oradan servis edelim
+  // core/ directory is served directly outside web root
   let filePath;
   if (rel.startsWith('/core/')) filePath = path.join(__dirname, rel);
   else filePath = path.join(ROOT, rel);
@@ -141,11 +141,11 @@ async function serveStatic(pathname, res) {
   const resolved = path.resolve(filePath);
   const allowed = [path.resolve(ROOT), path.resolve(path.join(__dirname, 'core'))];
   if (!allowed.some((a) => resolved === a || resolved.startsWith(a + path.sep))) {
-    return json(res, 403, { error: 'yasak yol' });
+    return json(res, 403, { error: 'forbidden path' });
   }
   try {
     const stat = await fsp.stat(resolved);
-    if (stat.isDirectory()) return json(res, 404, { error: 'bulunamadı' });
+    if (stat.isDirectory()) return json(res, 404, { error: 'not found' });
     const ext = path.extname(resolved).toLowerCase();
     res.writeHead(200, {
       'content-type': MIME[ext] || 'application/octet-stream',
@@ -154,7 +154,7 @@ async function serveStatic(pathname, res) {
     });
     fs.createReadStream(resolved).pipe(res);
   } catch {
-    json(res, 404, { error: `bulunamadı: ${rel}` });
+    json(res, 404, { error: `not found: ${rel}` });
   }
 }
 
@@ -164,7 +164,7 @@ function readBody(req, limit) {
     const chunks = [];
     req.on('data', (c) => {
       size += c.length;
-      if (size > limit) { reject(new Error('gövde çok büyük')); req.destroy(); return; }
+      if (size > limit) { reject(new Error('request body too large')); req.destroy(); return; }
       chunks.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));

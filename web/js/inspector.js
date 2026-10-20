@@ -100,10 +100,11 @@ export class InspectorView {
     const node = this.flow?.nodes?.[nodeId];
     if (!node) return this.showEmpty();
 
-    this.titleEl.textContent = `${node.type === 'end' ? 'Outcome Node' : 'Prompt Node'}: ${nodeLabel(node)}`;
-
     const isStart = this.flow.startId === node.id;
     const isEnd = node.type === 'end';
+    const isCode = node.type === 'code';
+
+    this.titleEl.textContent = `${isEnd ? 'Outcome Node' : isCode ? 'Code Node' : 'Prompt Node'}: ${nodeLabel(node)}`;
 
     const allNodeOptions = Object.values(this.flow.nodes)
       .map((n) => `<option value="${n.id}">${escapeHtml(nodeLabel(n))}</option>`)
@@ -115,6 +116,29 @@ export class InspectorView {
         <input type="text" id="nodeTitle" value="${escapeAttr(node.title || '')}" placeholder="Short descriptive label" />
       </div>
 
+      ${isCode ? `
+      <!-- Code Script Input -->
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>JavaScript Script</label>
+          <button class="btn btn-xs btn-outline" id="btnTestCode" type="button">▶ Test Run</button>
+        </div>
+        <textarea id="nodeCode" class="code-textarea" rows="10" spellcheck="false" placeholder="// Access vars, history, lastAnswer&#10;return 'OK';">${escapeHtml(node.code || '')}</textarea>
+        <div class="form-hint">Available: <code>vars</code>, <code>history</code>, <code>lastAnswer</code>. Mutate vars or return value.</div>
+        <div id="codeTestResult" class="code-test-result" style="display:none"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Score Points</label>
+          <input type="number" id="nodeScore" value="${node.score ?? 0}" step="1" />
+        </div>
+        <div class="form-group">
+          <label>Timeout (ms)</label>
+          <input type="number" id="nodeTimeoutMs" value="${node.timeoutMs ?? 5000}" step="500" min="500" max="60000" />
+        </div>
+      </div>
+      ` : `
       <div class="form-group">
         <label>${isEnd ? 'Outcome Note' : 'Prompt Template'}</label>
         <textarea id="nodePrompt" rows="${isEnd ? 3 : 5}" placeholder="Supports {{variable}}, {{attempt}}, {{budget}}">${escapeHtml(node.prompt || '')}</textarea>
@@ -142,6 +166,7 @@ export class InspectorView {
         </div>
         `}
       </div>
+      `}
 
       ${!isEnd ? `
       <!-- Context & Memory Policy -->
@@ -279,7 +304,45 @@ export class InspectorView {
     titleInput.addEventListener('input', () => { node.title = titleInput.value; this.onFlowMutated(); });
 
     const promptInput = this.container.querySelector('#nodePrompt');
-    promptInput.addEventListener('input', () => { node.prompt = promptInput.value; this.onFlowMutated(); });
+    if (promptInput) {
+      promptInput.addEventListener('input', () => { node.prompt = promptInput.value; this.onFlowMutated(); });
+    }
+
+    const codeInput = this.container.querySelector('#nodeCode');
+    if (codeInput) {
+      codeInput.addEventListener('input', () => { node.code = codeInput.value; this.onFlowMutated(); });
+    }
+
+    const timeoutInput = this.container.querySelector('#nodeTimeoutMs');
+    if (timeoutInput) {
+      timeoutInput.addEventListener('input', () => { node.timeoutMs = Number(timeoutInput.value) || 5000; this.onFlowMutated(); });
+    }
+
+    const btnTestCode = this.container.querySelector('#btnTestCode');
+    const codeResultEl = this.container.querySelector('#codeTestResult');
+    if (btnTestCode && codeResultEl) {
+      btnTestCode.addEventListener('click', () => {
+        try {
+          // eslint-disable-next-line no-new-func
+          const fn = new Function('context', 'vars', 'history', 'lastAnswer', `
+            "use strict";
+            const { input, step, node } = context;
+            ${node.code}
+          `);
+          const testVars = { sampleVar: 'testValue', attempt: 1 };
+          const ctx = { input: 'Sample test input', vars: testVars, history: [], lastAnswer: 'Sample test input', node };
+          const res = fn(ctx, testVars, [], 'Sample test input');
+          const str = typeof res === 'object' && res !== null ? JSON.stringify(res, null, 2) : String(res ?? '');
+          codeResultEl.style.display = 'block';
+          codeResultEl.className = 'code-test-result ok';
+          codeResultEl.textContent = `✓ Returned: ${str}`;
+        } catch (err) {
+          codeResultEl.style.display = 'block';
+          codeResultEl.className = 'code-test-result err';
+          codeResultEl.textContent = `✕ Syntax / Runtime Error: ${err.message}`;
+        }
+      });
+    }
 
     const scoreInput = this.container.querySelector('#nodeScore');
     scoreInput.addEventListener('input', () => { node.score = Number(scoreInput.value) || 0; this.onFlowMutated(); });

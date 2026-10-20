@@ -120,7 +120,8 @@ export class GraphView {
 
     for (const node of nodes) {
       const el = document.createElement('div');
-      el.className = `bench-node ${node.type === 'end' ? 'node-end' : 'node-prompt'}`;
+      const nodeTypeClass = node.type === 'end' ? 'node-end' : node.type === 'code' ? 'node-code' : 'node-prompt';
+      el.className = `bench-node ${nodeTypeClass}`;
       if (node.id === this.flow.startId) el.classList.add('start-node');
       if (node.id === this.selectedNodeId) el.classList.add('selected');
       if (node.id === this.activeNodeId) el.classList.add('is-active');
@@ -136,17 +137,23 @@ export class GraphView {
       if (node.type === 'end') {
         const cls = node.outcome === 'pass' ? 'badge-pass' : 'badge-fail';
         badgeHtml = `<span class="badge ${cls}">${(node.outcome || 'END').toUpperCase()}</span>`;
+      } else if (node.type === 'code') {
+        badgeHtml = `<span class="badge badge-code">&lt;/&gt; SCRIPT</span>`;
       } else if (node.maxAttempts) {
         badgeHtml = `<span class="badge badge-attempts">${node.maxAttempts}x</span>`;
       }
 
+      const bodyText = node.type === 'code'
+        ? (node.code || 'return "OK";')
+        : (node.prompt || (node.type === 'end' ? 'Terminal state' : 'No prompt set.'));
+
       el.innerHTML = `
         <div class="node-header">
-          <span class="node-tag">${node.type === 'end' ? 'Outcome' : 'Prompt'}</span>
+          <span class="node-tag">${node.type === 'end' ? 'Outcome' : node.type === 'code' ? 'Code Script' : 'Prompt'}</span>
           <div class="node-badges">${badgeHtml}</div>
         </div>
         <div class="node-title">${escapeHtml(nodeLabel(node))}</div>
-        <div class="node-body">${escapeHtml(node.prompt || (node.type === 'end' ? 'Terminal state' : 'No prompt set.'))}</div>
+        <div class="node-body ${node.type === 'code' ? 'code-snippet' : ''}">${escapeHtml(bodyText)}</div>
         <div class="node-footer">
           <span>${(node.edges || []).length} branches</span>
           <span>${node.score ? (node.score > 0 ? `+${node.score}` : node.score) + ' pts' : ''}</span>
