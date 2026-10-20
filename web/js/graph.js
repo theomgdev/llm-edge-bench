@@ -81,7 +81,6 @@ export class GraphView {
     }
     this.#updateEdgeStyles();
     this.opts.onSelectNode?.(id);
-    this.opts.onSelectEdge?.(null, null);
   }
 
   selectEdge(edgeId, fromNodeId) {
@@ -89,7 +88,6 @@ export class GraphView {
     this.selectedNodeId = null;
     for (const el of this.nodeEls.values()) el.classList.remove('selected');
     this.#updateEdgeStyles();
-    this.opts.onSelectNode?.(null);
     this.opts.onSelectEdge?.(edgeId, fromNodeId);
   }
 
@@ -98,8 +96,7 @@ export class GraphView {
     this.selectedEdge = null;
     for (const el of this.nodeEls.values()) el.classList.remove('selected');
     this.#updateEdgeStyles();
-    this.opts.onSelectNode?.(null);
-    this.opts.onSelectEdge?.(null, null);
+    this.opts.onClearSelection?.();
   }
 
   setActiveRunState(nodeId, edgeId) {
@@ -440,6 +437,9 @@ export class GraphView {
       if (this.draggingNode) {
         const dx = (e.clientX - this.draggingNode.startX) / this.scale;
         const dy = (e.clientY - this.draggingNode.startY) / this.scale;
+        if (Math.hypot(dx, dy) > 2) {
+          this.draggingNode.moved = true;
+        }
         const n = this.flow?.nodes?.[this.draggingNode.id];
         if (n) {
           n.ui = {
@@ -466,8 +466,11 @@ export class GraphView {
         c.classList.remove('panning');
       }
       if (this.draggingNode) {
+        const moved = this.draggingNode.moved;
         this.draggingNode = null;
-        this.opts.onFlowMutated?.();
+        if (moved) {
+          this.opts.onFlowMutated?.();
+        }
       }
       if (this.draftConn) {
         // Did we drop onto an in-port?

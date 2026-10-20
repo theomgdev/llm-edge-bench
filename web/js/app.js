@@ -64,8 +64,17 @@ class App {
       hudZoom: document.getElementById('hudZoom'),
       hudNodeCount: document.getElementById('hudNodeCount'),
       hudEdgeCount: document.getElementById('hudEdgeCount'),
-      onSelectNode: (id) => (id ? this.inspector.showNode(id) : this.inspector.showEmpty()),
-      onSelectEdge: (eid, fromId) => (eid ? this.inspector.showEdge(eid, fromId) : this.inspector.showEmpty()),
+      onSelectNode: (id) => {
+        this.openInspector();
+        this.inspector.showNode(id);
+      },
+      onSelectEdge: (eid, fromId) => {
+        this.openInspector();
+        this.inspector.showEdge(eid, fromId);
+      },
+      onClearSelection: () => {
+        this.inspector.showEmpty();
+      },
       onCreateEdge: (fromId, toId) => this.createEdge(fromId, toId),
       onFlowMutated: () => this.onFlowMutated(),
     });
@@ -73,6 +82,14 @@ class App {
     this.#initEvents();
     this.#loadInitialFlow();
     this.#checkServerConfig();
+  }
+
+  openInspector() {
+    document.getElementById('inspector').classList.remove('collapsed');
+  }
+
+  toggleInspector() {
+    document.getElementById('inspector').classList.toggle('collapsed');
   }
 
   // =========================================================================
@@ -523,13 +540,26 @@ class App {
       }
     });
 
+    // Inspector controls
+    document.getElementById('inspectorClose').addEventListener('click', () => {
+      if (this.graph.selectedNodeId || this.graph.selectedEdge) {
+        // Deselect node/edge and return to Flow Overview
+        this.graph.clearSelection();
+      } else {
+        // Already in Flow Overview: close/collapse the panel
+        document.getElementById('inspector').classList.add('collapsed');
+      }
+    });
+
+    const toggleInspectorBtn = document.getElementById('toolToggleInspector');
+    if (toggleInspectorBtn) {
+      toggleInspectorBtn.addEventListener('click', () => this.toggleInspector());
+    }
+
     // Console controls
     document.getElementById('btnToggleDrawer').addEventListener('click', () => this.console.toggle());
     document.getElementById('consoleHandle').addEventListener('dblclick', () => this.console.toggle());
     document.getElementById('btnClearConsole').addEventListener('click', () => this.console.clear());
-
-    // Inspector close button
-    document.getElementById('inspectorClose').addEventListener('click', () => this.graph.clearSelection());
 
     // Fetch models button
     document.getElementById('btnFetchModels').addEventListener('click', async () => {
@@ -556,6 +586,7 @@ class App {
       else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); this.addNode('end'); }
       else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.graph.fitView(); }
       else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); this.console.toggle(); }
+      else if (e.key === 'i' || e.key === 'I') { e.preventDefault(); this.toggleInspector(); }
       else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (this.graph.selectedNodeId) {
           const nid = this.graph.selectedNodeId;
