@@ -145,7 +145,7 @@ export class GraphView {
           <span class="node-tag">${node.type === 'end' ? 'Outcome' : 'Prompt'}</span>
           <div class="node-badges">${badgeHtml}</div>
         </div>
-        <div class="node-title" style="padding: 0 12px 4px 12px;">${escapeHtml(nodeLabel(node))}</div>
+        <div class="node-title">${escapeHtml(nodeLabel(node))}</div>
         <div class="node-body">${escapeHtml(node.prompt || (node.type === 'end' ? 'Terminal state' : 'No prompt set.'))}</div>
         <div class="node-footer">
           <span>${(node.edges || []).length} branches</span>
@@ -222,9 +222,10 @@ export class GraphView {
 
     g.appendChild(path);
 
-    // Midpoint label
+    // Midpoint label — sits ABOVE the curve so it never collides with port sockets
     const mid = this.#calcMidpoint(p1, p2);
-    const labelText = edge.label || describeCondition(edge.condition);
+    const rawLabel = edge.label || describeCondition(edge.condition);
+    const labelText = rawLabel.length > 24 ? `${rawLabel.slice(0, 23)}…` : rawLabel;
     if (labelText) {
       const lg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       lg.classList.add('edge-label-group');
@@ -237,6 +238,10 @@ export class GraphView {
       txt.textContent = labelText;
       txt.setAttribute('x', mid.x);
       txt.setAttribute('y', mid.y);
+
+      const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      titleEl.textContent = rawLabel;
+      lg.appendChild(titleEl);
 
       lg.appendChild(bg);
       lg.appendChild(txt);
@@ -325,9 +330,13 @@ export class GraphView {
     if (dx < 20) {
       const absDy = Math.abs(p2.y - p1.y);
       const clearance = Math.max(50, 85 - absDy * 0.15);
-      return { x: (p1.x + p2.x) / 2, y: Math.min(p1.y, p2.y) - clearance };
+      return { x: (p1.x + p2.x) / 2, y: Math.min(p1.y, p2.y) - clearance - 14 };
     }
-    return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    // Lift the label clear of the curve so it never overlaps a port socket.
+    const cx = (p1.x + p2.x) / 2;
+    const cy = (p1.y + p2.y) / 2;
+    const isHorizontal = Math.abs(p2.y - p1.y) < 12;
+    return { x: cx, y: isHorizontal ? cy - 16 : cy - 10 };
   }
 
   // ---------------------------------------------------------------- Viewport transform

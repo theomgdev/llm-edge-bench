@@ -564,8 +564,9 @@ class App {
       });
     });
 
-    // New Flow button
-    document.getElementById('btnNewFlow').addEventListener('click', () => {
+    // New Blank Flow
+    document.getElementById('btnNewFlow')?.addEventListener('click', () => {
+      document.getElementById('flowActionsMenu')?.classList.remove('open');
       if (this.dirty && !confirm('Discard unsaved changes and create new flow?')) return;
       const blank = createFlow({ name: 'Untitled Flow' });
       const q = createNode({ id: 'start_q', title: 'First Question', prompt: 'Hello, what is 2+2?', maxAttempts: 3 });
@@ -574,11 +575,33 @@ class App {
       this.setFlow(blank);
     });
 
+    // Duplicate Flow
+    document.getElementById('btnDuplicateFlow')?.addEventListener('click', () => {
+      document.getElementById('flowActionsMenu')?.classList.remove('open');
+      if (!this.flow) return;
+      const clone = JSON.parse(JSON.stringify(this.flow));
+      clone.id = `flow_${Date.now().toString(36)}`;
+      clone.name = `${this.flow.name || 'Flow'} (copy)`;
+      this.setFlow(clone);
+    });
+
+    // Flow Actions Dropdown
+    const flowActionsBtn = document.getElementById('btnFlowActions');
+    const flowActionsMenu = document.getElementById('flowActionsMenu');
+    if (flowActionsBtn && flowActionsMenu) {
+      flowActionsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.getElementById('templatesMenu')?.classList.remove('open');
+        flowActionsMenu.classList.toggle('open');
+      });
+    }
+
     // Templates Dropdown
     const tplBtn = document.getElementById('btnTemplates');
     const tplMenu = document.getElementById('templatesMenu');
     tplBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      document.getElementById('flowActionsMenu')?.classList.remove('open');
       tplMenu.classList.toggle('open');
       if (tplMenu.classList.contains('open')) {
         tplMenu.innerHTML = this.templates.map((tpl, i) => `
@@ -592,14 +615,16 @@ class App {
             const idx = Number(btn.dataset.tplIdx);
             tplMenu.classList.remove('open');
             if (this.dirty && !confirm('Discard unsaved changes and load template?')) return;
-            // Clone template
             const clone = JSON.parse(JSON.stringify(this.templates[idx]));
             this.setFlow(clone);
           });
         });
       }
     });
-    window.addEventListener('click', () => tplMenu.classList.remove('open'));
+    window.addEventListener('click', () => {
+      tplMenu.classList.remove('open');
+      document.getElementById('flowActionsMenu')?.classList.remove('open');
+    });
 
     // Export Flow
     document.getElementById('btnExport').addEventListener('click', () => {

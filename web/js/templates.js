@@ -27,7 +27,7 @@ function createArithmeticLadder() {
     prompt: 'What is 2 + 2? Output only the final number.',
     maxAttempts: 4,
     score: 0,
-    ui: { x: 80, y: 160 },
+    ui: { x: 60, y: 160 },
   });
 
   const q2 = createNode({
@@ -36,7 +36,7 @@ function createArithmeticLadder() {
     prompt: 'Correct! Now what is 16 + 16? Output only the number.',
     maxAttempts: 3,
     score: 0,
-    ui: { x: 440, y: 80 },
+    ui: { x: 500, y: 70 },
   });
 
   const why = createNode({
@@ -45,7 +45,7 @@ function createArithmeticLadder() {
     prompt: 'You gave an unexpected answer. Explain your calculation step by step.',
     maxAttempts: 2,
     score: 0,
-    ui: { x: 440, y: 280 },
+    ui: { x: 500, y: 290 },
   });
 
   const pass = createNode({
@@ -55,7 +55,7 @@ function createArithmeticLadder() {
     outcome: 'pass',
     score: 20,
     prompt: 'Solved both math problems correctly.',
-    ui: { x: 780, y: 80 },
+    ui: { x: 920, y: 70 },
   });
 
   const fail = createNode({
@@ -65,7 +65,7 @@ function createArithmeticLadder() {
     outcome: 'fail',
     score: -5,
     prompt: 'Failed arithmetic baseline.',
-    ui: { x: 780, y: 280 },
+    ui: { x: 920, y: 290 },
   });
 
   q1.edges = [

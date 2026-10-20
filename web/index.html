@@ -29,36 +29,57 @@
       </div>
     </div>
 
-    <!-- Flow Selector & Controls -->
+    <!-- Flow Selector & Menu -->
     <div class="flow-controls">
       <div class="flow-pill">
         <span class="dot" id="flowDirtyDot" title="Unsaved changes"></span>
         <input type="text" id="flowNameInput" value="Arithmetic Ladder" title="Rename flow" spellcheck="false" />
       </div>
-      <button class="btn btn-sm btn-ghost" id="btnNewFlow" title="New blank flow">+ New</button>
       <div class="dropdown-wrap">
         <button class="btn btn-sm btn-ghost" id="btnTemplates">Templates ▾</button>
         <div class="dropdown-menu" id="templatesMenu"></div>
       </div>
-      <button class="btn btn-sm btn-ghost" id="btnExport" title="Export flow JSON">Export</button>
-      <button class="btn btn-sm btn-ghost" id="btnImport" title="Import flow JSON">Import</button>
+      <div class="dropdown-wrap">
+        <button class="btn btn-sm btn-ghost" id="btnFlowActions">Flow ▾</button>
+        <div class="dropdown-menu" id="flowActionsMenu">
+          <button class="dropdown-item" id="btnNewFlow">
+            <span class="item-title">+ New Blank Flow</span>
+            <span class="item-desc">Start fresh graph</span>
+          </button>
+          <button class="dropdown-item" id="btnDuplicateFlow">
+            <span class="item-title">Duplicate Flow</span>
+            <span class="item-desc">Clone into a new flow</span>
+          </button>
+          <div class="dropdown-sep"></div>
+          <button class="dropdown-item" id="btnExport">
+            <span class="item-title">Export Flow JSON</span>
+            <span class="item-desc">Download to file</span>
+          </button>
+          <button class="dropdown-item" id="btnImport">
+            <span class="item-title">Import Flow JSON</span>
+            <span class="item-desc">Load from disk</span>
+          </button>
+        </div>
+      </div>
       <input type="file" id="importFileInput" accept=".json" style="display:none" />
     </div>
 
     <!-- Endpoint & Model Bar -->
     <div class="endpoint-bar">
-      <div class="input-group">
-        <span class="input-prefix" title="OpenAI-compatible base URL">API</span>
-        <input type="text" id="apiBaseUrl" value="http://127.0.0.1:20128/v1" placeholder="https://api.openai.com/v1" spellcheck="false" />
+      <div class="input-group api-url-group">
+        <span class="input-prefix" title="OpenAI-compatible base URL">URL</span>
+        <input type="text" id="apiBaseUrl" value="http://127.0.0.1:20128/v1" placeholder="http://127.0.0.1:20128/v1" spellcheck="false" />
       </div>
-      <div class="input-group">
-        <input type="password" id="apiKey" placeholder="API key (optional for local)" spellcheck="false" autocomplete="off" />
-        <button class="btn btn-xs btn-ghost" id="btnToggleApiKey" title="Show/Hide API key" style="padding:0 8px; color:var(--text-dim);">👁</button>
+      <div class="input-group api-key-group">
+        <span class="input-prefix" title="Bearer API key">KEY</span>
+        <input type="password" id="apiKey" placeholder="optional" spellcheck="false" autocomplete="off" />
+        <button class="btn btn-xs btn-ghost btn-key-eye" id="btnToggleApiKey" title="Show/Hide API key">👁</button>
       </div>
       <div class="input-group model-group">
+        <span class="input-prefix" title="Target LLM model identifier">MODEL</span>
         <input type="text" id="modelInput" value="agy/gemini-3.1-flash-lite" placeholder="model name" spellcheck="false" list="modelsDataList" />
         <datalist id="modelsDataList"></datalist>
-        <button class="btn btn-xs btn-ghost" id="btnFetchModels" title="Refresh model list from endpoint">↻</button>
+        <button class="btn btn-xs btn-ghost btn-refresh-models" id="btnFetchModels" title="Discover models from endpoint">↻</button>
       </div>
     </div>
 
@@ -160,11 +181,14 @@
 
   <!-- Bottom Execution Console (Resizable / Collapsible) -->
   <footer class="console-drawer" id="consoleDrawer">
-    <div class="console-handle" id="consoleHandle">
+    <div class="console-handle" id="consoleHandle" title="Drag vertically to resize console">
       <div class="console-handle-title">
         <span class="pulse-dot" id="runPulseDot"></span>
         <span id="runStatusText">Idle</span>
         <span class="console-stats" id="consoleStats"></span>
+      </div>
+      <div class="console-drag-grabber" title="Drag to resize">
+        <span></span>
       </div>
       <div class="console-handle-actions">
         <button class="btn btn-xs btn-ghost" id="btnClearConsole">Clear</button>
@@ -180,21 +204,21 @@
         <!-- Live Path & Context Preview -->
         <div class="console-sidebar">
           <div class="panel-section">
+            <div class="section-title">Telemetry</div>
+            <div class="metric-grid-compact">
+              <div class="metric"><div class="metric-val" id="metRequests">0</div><div class="metric-lbl">Reqs</div></div>
+              <div class="metric"><div class="metric-val" id="metTokens">0</div><div class="metric-lbl">Tokens</div></div>
+              <div class="metric"><div class="metric-val" id="metScore">0</div><div class="metric-lbl">Score</div></div>
+              <div class="metric"><div class="metric-val" id="metDuration">0s</div><div class="metric-lbl">Time</div></div>
+            </div>
+          </div>
+          <div class="panel-section">
             <div class="section-title">Execution Path</div>
             <div class="path-chips" id="pathChips"><span class="chip-empty">—</span></div>
           </div>
           <div class="panel-section">
             <div class="section-title">Captured Variables</div>
             <pre class="vars-pre" id="varsPre">{}</pre>
-          </div>
-          <div class="panel-section">
-            <div class="section-title">Token / Cost Live</div>
-            <div class="metric-grid">
-              <div class="metric"><div class="metric-val" id="metRequests">0</div><div class="metric-lbl">Requests</div></div>
-              <div class="metric"><div class="metric-val" id="metTokens">0</div><div class="metric-lbl">Tokens</div></div>
-              <div class="metric"><div class="metric-val" id="metScore">0</div><div class="metric-lbl">Score</div></div>
-              <div class="metric"><div class="metric-val" id="metDuration">0s</div><div class="metric-lbl">Duration</div></div>
-            </div>
           </div>
         </div>
       </div>
