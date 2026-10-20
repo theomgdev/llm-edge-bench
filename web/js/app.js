@@ -9,6 +9,15 @@ import { GraphView } from './graph.js';
 import { InspectorView } from './inspector.js';
 import { ConsoleView } from './console-view.js';
 import { getTemplates } from './templates.js';
+import {
+  listSavedFlows,
+  getSavedFlow,
+  saveFlow,
+  deleteSavedFlow,
+  duplicateSavedFlow,
+  getCurrentSavedFlow,
+  initStorageWithTemplates,
+} from './flow-storage.js';
 
 class App {
   constructor() {
@@ -157,16 +166,17 @@ class App {
   // Initialization & Flow Loading
   // =========================================================================
   #loadInitialFlow() {
-    const saved = localStorage.getItem('llm_edge_bench_current_flow');
+    initStorageWithTemplates(this.templates);
+    const saved = getCurrentSavedFlow();
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        this.setFlow(parsed, false);
+        this.setFlow(saved, false);
         return;
       } catch { /* fallback to template */ }
     }
-    // Default to the first rich template (Arithmetic Ladder)
-    this.setFlow(this.templates[0], false);
+    // Default to Arithmetic Ladder
+    const fallbackTpl = this.templates.find((t) => t.id === 'tpl_arithmetic') || this.templates[0];
+    this.setFlow(fallbackTpl, false);
   }
 
   setFlow(flow, markDirty = true) {
@@ -187,10 +197,16 @@ class App {
   setDirty(dirty) {
     this.dirty = dirty;
     this.flowDirtyDot.classList.toggle('dirty', dirty);
+    const statusText = document.getElementById('saveStatusText');
     if (this.flow) {
-      try {
-        localStorage.setItem('llm_edge_bench_current_flow', JSON.stringify(this.flow));
-      } catch { /* quota exceeded */ }
+      saveFlow(this.flow, true);
+      if (statusText) {
+        statusText.textContent = dirty ? 'Saving...' : 'Saved';
+        setTimeout(() => {
+          if (statusText) statusText.textContent = 'Saved';
+          this.flowDirtyDot.classList.remove('dirty');
+        }, 300);
+      }
     }
   }
 
@@ -258,7 +274,7 @@ class App {
       alert(`Cannot run flow:\n- ${v.errors.join('\n- ')}`);
       return;
     }
-    if (v.hasExpr) {
+    if (v.hasExpr && !this.flow.settings?.allowExpr) {
       const ok = confirm('This flow contains custom JavaScript expressions (expr conditions). Allow them to execute?');
       if (!ok) return;
     }
@@ -565,24 +581,25 @@ class App {
       });
     });
 
+    // My Flows Button & Menu Item
+    document.getElementById('btnMyFlows')?.addEventListener('click', () => this.openMyFlowsModal());
+    document.getElementById('btnMenuMyFlows')?.addEventListener('click', () => {
+      document.getElementById('flowActionsMenu')?.classList.remove('open');
+      this.openMyFlowsModal();
+    });
+
     // New Blank Flow
     document.getElementById('btnNewFlow')?.addEventListener('click', () => {
       document.getElementById('flowActionsMenu')?.classList.remove('open');
       if (this.dirty && !confirm('Discard unsaved changes and create new flow?')) return;
-      const blank = createFlow({ name: 'Untitled Flow' });
-      const q = createNode({ id: 'start_q', title: 'First Question', prompt: 'Hello, what is 2+2?', maxAttempts: 3 });
-      blank.nodes[q.id] = q;
-      blank.startId = q.id;
-      this.setFlow(blank);
+      this.newFlow();
     });
 
     // Duplicate Flow
     document.getElementById('btnDuplicateFlow')?.addEventListener('click', () => {
       document.getElementById('flowActionsMenu')?.classList.remove('open');
       if (!this.flow) return;
-      const clone = JSON.parse(JSON.stringify(this.flow));
-      clone.id = `flow_${Date.now().toString(36)}`;
-      clone.name = `${this.flow.name || 'Flow'} (copy)`;
+      const clone = duplicateSavedFlow(this.flow);
       this.setFlow(clone);
     });
 
@@ -617,6 +634,7 @@ class App {
             tplMenu.classList.remove('open');
             if (this.dirty && !confirm('Discard unsaved changes and load template?')) return;
             const clone = JSON.parse(JSON.stringify(this.templates[idx]));
+            saveFlow(clone, true);
             this.setFlow(clone);
           });
         });
@@ -629,14 +647,7 @@ class App {
 
     // Export Flow
     document.getElementById('btnExport').addEventListener('click', () => {
-      const json = JSON.stringify(this.flow, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${(this.flow.name || 'flow').replace(/[^\w-]/g, '_')}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      this.exportFlow(this.flow);
     });
 
     // Import Flow
@@ -649,6 +660,7 @@ class App {
         const text = await file.text();
         const parsed = JSON.parse(text);
         if (!parsed.nodes) throw new Error('File does not look like a valid flow JSON.');
+        saveFlow(parsed, true);
         this.setFlow(parsed);
       } catch (err) {
         alert(`Failed to import flow: ${err.message}`);
@@ -754,6 +766,198 @@ class App {
           }
         }
       }
+    });
+  }
+
+  newFlow() {
+    const blank = createFlow({ name: 'Untitled Flow' });
+    const q = createNode({ id: 'start_q', title: 'First Question', prompt: 'Hello, what is 2+2?', maxAttempts: 3 });
+    blank.nodes[q.id] = q;
+    blank.startId = q.id;
+    saveFlow(blank, true);
+    this.setFlow(blank);
+  }
+
+  exportFlow(flow = this.flow) {
+    if (!flow) return;
+    const json = JSON.stringify(flow, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(flow.name || 'flow').replace(/[^\w-]/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  closeModal() {
+    this.modalBackdrop.style.display = 'none';
+    this.modalCard.innerHTML = '';
+    this.modalCard.className = 'modal-card';
+  }
+
+  openMyFlowsModal() {
+    this.modalCard.className = 'modal-card modal-card-lg';
+    this.modalCard.innerHTML = `
+      <div class="modal-header">
+        <div>
+          <h3>📂 Saved Flows Library</h3>
+          <p style="font-size:11.5px; color:var(--text-dim); margin-top:2px;">All flows are autosaved in browser storage. Switch, duplicate, rename, or export anytime.</p>
+        </div>
+        <button class="btn btn-xs btn-ghost" id="modalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" class="input flow-lib-search" id="flowSearchInput" placeholder="Search saved flows..." />
+          <button class="btn btn-sm btn-outline" id="btnLibNewBlank" style="white-space:nowrap;">+ New Flow</button>
+          <button class="btn btn-sm btn-outline" id="btnLibImport" style="white-space:nowrap;">📥 Import JSON</button>
+        </div>
+        <div id="flowListContainer"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-outline" id="modalCloseFooter">Close</button>
+      </div>
+    `;
+
+    this.modalBackdrop.style.display = 'grid';
+
+    const renderList = (filter = '') => {
+      const allFlows = listSavedFlows();
+      const flows = allFlows.filter((f) => {
+        if (!filter) return true;
+        const q = filter.toLowerCase();
+        return f.name.toLowerCase().includes(q) || (f.description || '').toLowerCase().includes(q);
+      });
+
+      const container = this.modalCard.querySelector('#flowListContainer');
+      if (!container) return;
+
+      if (flows.length === 0) {
+        container.innerHTML = `<div class="inspector-empty" style="padding: 24px; text-align: center;">No saved flows found matching "${escapeHtml(filter)}".</div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="flow-lib-grid">
+          ${flows.map((f) => {
+            const isActive = this.flow && this.flow.id === f.id;
+            const dateStr = new Date(f.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+            return `
+              <div class="flow-lib-card ${isActive ? 'active-flow' : ''}" data-flow-id="${escapeHtml(f.id)}">
+                <div class="flow-lib-header">
+                  <div class="flow-lib-title">
+                    <span>${escapeHtml(f.name)}</span>
+                    ${isActive ? '<span class="flow-lib-badge badge-active">● Active</span>' : ''}
+                  </div>
+                  <span class="flow-lib-meta">${escapeHtml(dateStr)}</span>
+                </div>
+                <div class="flow-lib-desc">${escapeHtml(f.description || 'No description.')}</div>
+                <div class="flow-lib-header" style="margin-top:2px;">
+                  <div class="flow-lib-meta">
+                    <span><strong>${f.nodeCount}</strong> nodes</span>
+                    <span>•</span>
+                    <span><strong>${f.edgeCount}</strong> branches</span>
+                    ${f.startId ? `<span>•</span><span>Start: <code>${escapeHtml(f.startId)}</code></span>` : ''}
+                  </div>
+                  <div class="flow-lib-actions">
+                    ${!isActive ? `<button class="btn btn-xs btn-primary btn-open-flow" data-id="${escapeHtml(f.id)}">Open Flow</button>` : '<button class="btn btn-xs btn-outline" disabled>Currently Open</button>'}
+                    <button class="btn btn-xs btn-outline btn-dup-flow" data-id="${escapeHtml(f.id)}" title="Duplicate this flow">Duplicate</button>
+                    <button class="btn btn-xs btn-outline btn-rename-flow" data-id="${escapeHtml(f.id)}" title="Rename this flow">Rename</button>
+                    <button class="btn btn-xs btn-outline btn-export-flow" data-id="${escapeHtml(f.id)}" title="Export JSON">Export</button>
+                    ${allFlows.length > 1 ? `<button class="btn btn-xs btn-danger btn-del-flow" data-id="${escapeHtml(f.id)}" title="Delete from storage">Delete</button>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+
+      // Bind actions
+      container.querySelectorAll('.btn-open-flow').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const target = getSavedFlow(id);
+          if (target) {
+            this.setFlow(target);
+            this.closeModal();
+          }
+        });
+      });
+
+      container.querySelectorAll('.btn-dup-flow').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const target = getSavedFlow(id);
+          if (target) {
+            duplicateSavedFlow(target);
+            renderList(filter);
+          }
+        });
+      });
+
+      container.querySelectorAll('.btn-rename-flow').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const target = getSavedFlow(id);
+          if (!target) return;
+          const newName = prompt('New flow name:', target.name || '');
+          if (newName && newName.trim()) {
+            target.name = newName.trim();
+            saveFlow(target, this.flow?.id === id);
+            if (this.flow?.id === id) {
+              this.flowNameInput.value = target.name;
+            }
+            renderList(filter);
+          }
+        });
+      });
+
+      container.querySelectorAll('.btn-export-flow').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const target = getSavedFlow(id);
+          if (target) this.exportFlow(target);
+        });
+      });
+
+      container.querySelectorAll('.btn-del-flow').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const target = getSavedFlow(id);
+          if (!target) return;
+          if (!confirm(`Delete flow "${target.name || 'Untitled'}" from browser storage?`)) return;
+          deleteSavedFlow(id);
+          if (this.flow?.id === id) {
+            const remaining = listSavedFlows();
+            if (remaining.length > 0) {
+              this.setFlow(remaining[0].flow);
+            } else {
+              this.newFlow();
+            }
+          }
+          renderList(filter);
+        });
+      });
+    };
+
+    renderList('');
+
+    const searchInput = this.modalCard.querySelector('#flowSearchInput');
+    searchInput?.focus();
+    searchInput?.addEventListener('input', (e) => {
+      renderList(e.target.value.trim());
+    });
+
+    this.modalCard.querySelector('#modalClose')?.addEventListener('click', () => this.closeModal());
+    this.modalCard.querySelector('#modalCloseFooter')?.addEventListener('click', () => this.closeModal());
+    this.modalCard.querySelector('#btnLibNewBlank')?.addEventListener('click', () => {
+      this.closeModal();
+      this.newFlow();
+    });
+    this.modalCard.querySelector('#btnLibImport')?.addEventListener('click', () => {
+      this.closeModal();
+      document.getElementById('importFileInput')?.click();
     });
   }
 }

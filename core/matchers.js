@@ -151,9 +151,24 @@ function evaluate(text, cond) {
       }
       const m = re.exec(text);
       if (!m) return { ok: false, detail: `/${value}/${cond.flags || 'i'} did not match` };
-      const captures = {};
-      m.forEach((g, i) => { if (i) captures[`$${i}`] = g; });
-      if (m.groups) Object.assign(captures, m.groups);
+      const captures = {
+        $0: m[0],
+        0: m[0],
+        $match: m[0],
+        match: m[0],
+      };
+      m.forEach((g, i) => {
+        if (i) {
+          captures[`$${i}`] = g;
+          captures[`${i}`] = g;
+        }
+      });
+      if (m.groups) {
+        for (const [k, v] of Object.entries(m.groups)) {
+          captures[k] = v;
+          captures[`$${k}`] = v;
+        }
+      }
       return { ok: true, captures, detail: `matched "${m[0]}"` };
     }
 
@@ -180,9 +195,17 @@ function evaluate(text, cond) {
       }
       const matched = pool.filter(test);
       const ok = which === 'all' ? matched.length === pool.length && pool.length > 0 : matched.length > 0;
+      const val = String(matched[0] ?? pool[0]);
       return {
         ok,
-        captures: ok ? { $num: String(matched[0] ?? pool[0]) } : undefined,
+        captures: ok ? {
+          $num: val,
+          num: val,
+          $0: val,
+          0: val,
+          $match: val,
+          match: val,
+        } : undefined,
         detail: `numbers [${nums.join(', ')}] ${cond.op || 'eq'} ${cond.op === 'between' ? `${cond.min}..${cond.max}` : cond.value} -> ${ok}`,
       };
     }
@@ -198,14 +221,27 @@ function evaluate(text, cond) {
     case 'json': {
       const parsed = tryParseJson(text);
       if (!parsed.ok) return { ok: false, detail: 'no valid JSON found' };
-      if (!cond.path) return { ok: true, captures: { $json: JSON.stringify(parsed.value) }, detail: 'valid JSON' };
+      if (!cond.path) {
+        const raw = JSON.stringify(parsed.value);
+        return { ok: true, captures: { $json: raw, json: raw, $0: raw, 0: raw }, detail: 'valid JSON' };
+      }
       const got = getPath(parsed.value, cond.path);
       if (got === undefined) return { ok: false, detail: `path missing: ${cond.path}` };
+      const valStr = typeof got === 'object' ? JSON.stringify(got) : String(got);
+      const cleanPath = String(cond.path).replace(/[^a-zA-Z0-9_]/g, '_');
+      const captures = {
+        $json: valStr,
+        json: valStr,
+        $0: valStr,
+        0: valStr,
+        [cleanPath]: valStr,
+        [`$${cleanPath}`]: valStr,
+      };
       if (cond.value === '' || cond.value == null) {
-        return { ok: true, captures: { $json: String(got) }, detail: `${cond.path} = ${JSON.stringify(got)}` };
+        return { ok: true, captures, detail: `${cond.path} = ${JSON.stringify(got)}` };
       }
       const ok = String(got).trim().toLowerCase() === String(cond.value).trim().toLowerCase();
-      return { ok, captures: { $json: String(got) }, detail: `${cond.path} = ${JSON.stringify(got)} vs ${cond.value}` };
+      return { ok, captures, detail: `${cond.path} = ${JSON.stringify(got)} vs ${cond.value}` };
     }
 
     case 'expr': {

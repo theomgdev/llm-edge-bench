@@ -32,9 +32,11 @@
     <!-- Flow Selector & Menu -->
     <div class="flow-controls">
       <div class="flow-pill">
-        <span class="dot" id="flowDirtyDot" title="Unsaved changes"></span>
+        <span class="dot" id="flowDirtyDot" title="Autosaved"></span>
         <input type="text" id="flowNameInput" value="Arithmetic Ladder" title="Rename flow" spellcheck="false" />
+        <span class="save-status-text" id="saveStatusText" title="All edits autosaved to browser storage">Saved</span>
       </div>
+      <button class="btn btn-sm btn-outline" id="btnMyFlows" title="Open saved flows library">📂 My Flows</button>
       <div class="dropdown-wrap">
         <button class="btn btn-sm btn-ghost" id="btnTemplates">Templates ▾</button>
         <div class="dropdown-menu" id="templatesMenu"></div>
@@ -42,6 +44,11 @@
       <div class="dropdown-wrap">
         <button class="btn btn-sm btn-ghost" id="btnFlowActions">Flow ▾</button>
         <div class="dropdown-menu" id="flowActionsMenu">
+          <button class="dropdown-item" id="btnMenuMyFlows">
+            <span class="item-title">📂 My Flows Library...</span>
+            <span class="item-desc">Browse, rename & manage saved flows</span>
+          </button>
+          <div class="dropdown-sep"></div>
           <button class="dropdown-item" id="btnNewFlow">
             <span class="item-title">+ New Blank Flow</span>
             <span class="item-desc">Start fresh graph</span>

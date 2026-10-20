@@ -140,6 +140,20 @@ html, body {
 }
 .flow-pill .dot.dirty { background: var(--color-warning); }
 
+.save-status-text {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  font-weight: 500;
+  white-space: nowrap;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+  user-select: none;
+  transition: color 0.2s;
+}
+.flow-pill .dot.dirty ~ .save-status-text {
+  color: var(--color-warning);
+}
+
 .endpoint-bar {
   display: flex;
   align-items: center;
@@ -1096,6 +1110,84 @@ html, body {
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+}
+.modal-card-lg {
+  max-width: 780px;
+  width: 92%;
+}
+
+.flow-lib-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.flow-lib-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.flow-lib-card:hover {
+  border-color: var(--border-subtle);
+  background: var(--bg-hover);
+}
+.flow-lib-card.active-flow {
+  border-color: var(--color-primary);
+  background: rgba(79, 141, 249, 0.05);
+}
+.flow-lib-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.flow-lib-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.flow-lib-badge {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 600;
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.flow-lib-badge.badge-active {
+  background: rgba(79, 141, 249, 0.15);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.flow-lib-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.flow-lib-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.flow-lib-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
 }
 
 .modal-header {

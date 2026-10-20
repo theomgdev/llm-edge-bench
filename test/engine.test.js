@@ -399,6 +399,66 @@ t('validate: clean flow has no errors', () => {
   assert.deepEqual(v.warnings, []);
 });
 
+// ---------------------------------------------------------------- interpolation & variables
+t('interpolate: handles {{$var}} and {{var}} interchangeably', () => {
+  const vars = { code: '8492', $num: '42' };
+  assert.equal(interpolate('Code is {{$code}}', vars), 'Code is 8492');
+  assert.equal(interpolate('Code is {{code}}', vars), 'Code is 8492');
+  assert.equal(interpolate('Num is {{num}}', vars), 'Num is 42');
+  assert.equal(interpolate('Num is {{$num}}', vars), 'Num is 42');
+  assert.equal(interpolate('Attempt {{ attempt }} of {{ budget }}', { attempt: '1', budget: '3' }), 'Attempt 1 of 3');
+});
+
+await ta('engine: multi-turn state tracker captures named regex and interpolates {{$code}}', async () => {
+  let promptSeenInSecondStep = '';
+  const client = new MockClient((messages) => {
+    const last = messages.at(-1).content;
+    if (last.includes('Generate a secret 4-digit')) {
+      return 'I picked 9876.';
+    }
+    promptSeenInSecondStep = last;
+    return 'Reversed: 6789.';
+  });
+
+  const flow = {
+    id: 'test_state',
+    startId: 'pick',
+    settings: { memory: 'isolated' },
+    nodes: {
+      pick: {
+        id: 'pick',
+        prompt: 'Generate a secret 4-digit code.',
+        edges: [
+          {
+            id: 'e1',
+            to: 'recall',
+            condition: { type: 'regex', value: '(?<code>\\b\\d{4}\\b)' },
+          },
+        ],
+      },
+      recall: {
+        id: 'recall',
+        prompt: 'A moment ago you picked code {{$code}}. Reverse those 4 digits now.',
+        edges: [
+          {
+            id: 'e2',
+            to: 'done',
+            condition: { type: 'regex', value: '\\b\\d{4}\\b' },
+          },
+        ],
+      },
+      done: { id: 'done', type: 'end', outcome: 'pass', score: 10 },
+    },
+  };
+
+  const run = await runFlow(flow, client);
+  assert.equal(run.status, 'done');
+  assert.equal(run.outcome, 'pass');
+  assert.equal(promptSeenInSecondStep, 'A moment ago you picked code 9876. Reverse those 4 digits now.');
+  assert.equal(run.vars.code, '9876');
+  assert.equal(run.vars.$code, '9876');
+});
+
 // ---------------------------------------------------------------- batch run
 await ta('runBatch: 2 models x 3 repeats', async () => {
   const good = { label: 'good-model', client: new MockClient((m) => (m.at(-1).content.includes('16+16') ? '32' : '4')) };

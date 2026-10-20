@@ -121,11 +121,28 @@ function stripKeys(o, keys) {
 }
 
 /** Fills {{variable}} placeholders from vars dictionary. */
-export function interpolate(template, vars) {
+export function interpolate(template, vars = {}) {
   if (!template) return '';
-  return String(template).replace(/\{\{\s*([^}]+?)\s*\}\}/g, (full, key) => {
-    const v = vars[key];
-    return v === undefined || v === null ? full : String(v);
+  return String(template).replace(/\{\{\s*([^}]+?)\s*\}\}/g, (full, rawKey) => {
+    const key = rawKey.trim();
+    // 1. Direct match
+    if (vars[key] !== undefined && vars[key] !== null) return String(vars[key]);
+    // 2. $ prefix mismatch: match $foo with foo, or foo with $foo
+    if (key.startsWith('$')) {
+      const stripped = key.slice(1);
+      if (vars[stripped] !== undefined && vars[stripped] !== null) return String(vars[stripped]);
+    } else {
+      const prepended = `$${key}`;
+      if (vars[prepended] !== undefined && vars[prepended] !== null) return String(vars[prepended]);
+    }
+    // 3. Case-insensitive fallback
+    const keyNorm = key.replace(/^\$/, '').toLowerCase();
+    for (const [k, v] of Object.entries(vars)) {
+      if (k.replace(/^\$/, '').toLowerCase() === keyNorm) {
+        if (v !== undefined && v !== null) return String(v);
+      }
+    }
+    return full;
   });
 }
 
@@ -317,10 +334,15 @@ export async function runFlow(flow, client, opts = {}) {
       const liveVars = {
         ...vars,
         attempt: String(attempt),
+        $attempt: String(attempt),
         budget: String(budget),
+        $budget: String(budget),
         remaining: String(Math.max(0, budget - attempt)),
+        $remaining: String(Math.max(0, budget - attempt)),
         step: String(run.steps.length + 1),
+        $step: String(run.steps.length + 1),
         node: nodeLabel(node),
+        $node: nodeLabel(node),
       };
       const promptText = interpolate(node.prompt, liveVars);
 
@@ -397,7 +419,7 @@ export async function runFlow(flow, client, opts = {}) {
       let taken = null;
       const tried = [];
       for (const edge of node.edges || []) {
-        const cond = prepCondition(edge.condition, opts.allowExpr);
+        const cond = prepCondition(edge.condition, opts.allowExpr, vars);
         const res = matchGroup(normAnswer, cond);
         tried.push({ edgeId: edge.id, label: edge.label || describeCondition(edge.condition), ok: res.ok, detail: res.detail });
         if (res.ok) { taken = { edge, res }; break; }
@@ -424,6 +446,15 @@ export async function runFlow(flow, client, opts = {}) {
         nextNodeId: null,
         action: null,
       };
+
+      // Always update lastAnswer so downstream prompts can reference {{lastAnswer}} or {{$lastAnswer}}
+      const ansTrim = rawAnswer.trim();
+      vars.lastAnswer = ansTrim;
+      vars.$lastAnswer = ansTrim;
+      vars.answer = ansTrim;
+      vars.$answer = ansTrim;
+      vars.prevNode = node.id;
+      vars.$prevNode = node.id;
 
       if (taken) {
         const { edge, res } = taken;
@@ -497,13 +528,27 @@ export async function runFlow(flow, client, opts = {}) {
   return run;
 }
 
-function prepCondition(cond, allowExpr) {
-  if (allowExpr || !containsExpr(cond)) return cond;
+function prepCondition(cond, allowExpr, vars = {}) {
+  if (!cond) return cond;
   const walk = (c) => {
     if (!c) return c;
-    if (c.type === 'expr') return { ...c, __denied: true };
     const out = { ...c };
-    for (const k of ['all', 'any']) if (Array.isArray(c[k])) out[k] = c[k].map(walk);
+    if (!allowExpr && c.type === 'expr') {
+      out.__denied = true;
+    }
+    // Interpolate variable placeholders in condition string value (e.g. contains: "{{$code}}")
+    if (typeof out.value === 'string' && out.value.includes('{{')) {
+      out.value = interpolate(out.value, vars);
+    }
+    if (Array.isArray(out.values)) {
+      out.values = out.values.map((v) => typeof v === 'string' && v.includes('{{') ? interpolate(v, vars) : v);
+    }
+    if (out.type === 'expr') {
+      out.vars = { ...vars };
+    }
+    for (const k of ['all', 'any']) {
+      if (Array.isArray(c[k])) out[k] = c[k].map(walk);
+    }
     return out;
   };
   return walk(cond);
