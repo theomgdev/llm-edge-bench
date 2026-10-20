@@ -166,7 +166,6 @@ export class GraphView {
       el.addEventListener('mousedown', (e) => {
         if (e.target.dataset.port === 'out') return; // port takes over
         e.stopPropagation();
-        this.selectNode(node.id);
         this.draggingNode = {
           id: node.id,
           startX: e.clientX,
@@ -174,6 +173,11 @@ export class GraphView {
           origX: node.ui?.x ?? 0,
           origY: node.ui?.y ?? 0,
         };
+        try {
+          this.selectNode(node.id);
+        } catch (err) {
+          console.error('Error in selectNode:', err);
+        }
       });
 
       // Port dragging (create edge)

@@ -137,6 +137,10 @@ export class InspectorView {
           <label>Timeout (ms)</label>
           <input type="number" id="nodeTimeoutMs" value="${node.timeoutMs ?? 5000}" step="500" min="500" max="60000" />
         </div>
+        <div class="form-group">
+          <label>Max Attempts</label>
+          <input type="number" id="nodeMaxAttempts" value="${node.maxAttempts ?? ''}" placeholder="1" min="1" max="50" />
+        </div>
       </div>
       ` : `
       <div class="form-group">
@@ -168,7 +172,7 @@ export class InspectorView {
       </div>
       `}
 
-      ${!isEnd ? `
+      ${!isEnd && !isCode ? `
       <!-- Context & Memory Policy -->
       <div class="form-group">
         <label>Conversation Memory</label>
@@ -197,8 +201,10 @@ export class InspectorView {
           <span>Reset conversation context upon entering this node</span>
         </label>
       </div>
+      ` : ''}
 
       <!-- Fallback Behaviors -->
+      ${!isEnd ? `
       <div class="form-group">
         <label>When No Edge Matches</label>
         <select id="nodeFallback">
@@ -349,34 +355,34 @@ export class InspectorView {
 
     if (isEnd) {
       const outcomeSelect = this.container.querySelector('#nodeOutcome');
-      outcomeSelect.addEventListener('change', () => { node.outcome = outcomeSelect.value; this.onFlowMutated(); });
+      outcomeSelect?.addEventListener('change', () => { node.outcome = outcomeSelect.value; this.onFlowMutated(); });
     } else {
       const maxAttInput = this.container.querySelector('#nodeMaxAttempts');
-      maxAttInput.addEventListener('input', () => {
+      maxAttInput?.addEventListener('input', () => {
         node.maxAttempts = maxAttInput.value ? Number(maxAttInput.value) : null;
         this.onFlowMutated();
       });
 
       const memSelect = this.container.querySelector('#nodeMemory');
-      memSelect.addEventListener('change', () => { node.memory = memSelect.value || null; this.onFlowMutated(); });
+      memSelect?.addEventListener('change', () => { node.memory = memSelect.value || null; this.onFlowMutated(); });
 
       const retryMemSelect = this.container.querySelector('#nodeRetryMemory');
-      retryMemSelect.addEventListener('change', () => { node.retryMemory = retryMemSelect.value || null; this.onFlowMutated(); });
+      retryMemSelect?.addEventListener('change', () => { node.retryMemory = retryMemSelect.value || null; this.onFlowMutated(); });
 
       const resetCheck = this.container.querySelector('#nodeResetContext');
-      resetCheck.addEventListener('change', () => { node.resetContextOnEnter = resetCheck.checked; this.onFlowMutated(); });
+      resetCheck?.addEventListener('change', () => { node.resetContextOnEnter = resetCheck.checked; this.onFlowMutated(); });
 
       const fallbackSelect = this.container.querySelector('#nodeFallback');
       const fallbackTargetGroup = this.container.querySelector('#fallbackTargetGroup');
       const fallbackTargetSelect = this.container.querySelector('#nodeFallbackTarget');
-      if (node.fallbackTarget) fallbackTargetSelect.value = node.fallbackTarget;
+      if (node.fallbackTarget && fallbackTargetSelect) fallbackTargetSelect.value = node.fallbackTarget;
 
-      fallbackSelect.addEventListener('change', () => {
+      fallbackSelect?.addEventListener('change', () => {
         node.fallback = fallbackSelect.value;
-        fallbackTargetGroup.style.display = node.fallback === 'goto' ? 'flex' : 'none';
+        if (fallbackTargetGroup) fallbackTargetGroup.style.display = node.fallback === 'goto' ? 'flex' : 'none';
         this.onFlowMutated();
       });
-      fallbackTargetSelect.addEventListener('change', () => {
+      fallbackTargetSelect?.addEventListener('change', () => {
         node.fallbackTarget = fallbackTargetSelect.value || null;
         this.onFlowMutated();
       });
@@ -384,19 +390,19 @@ export class InspectorView {
       const exhSelect = this.container.querySelector('#nodeOnExhausted');
       const exhTargetGroup = this.container.querySelector('#onExhaustedTargetGroup');
       const exhTargetSelect = this.container.querySelector('#nodeOnExhaustedTarget');
-      if (node.onExhaustedTarget) exhTargetSelect.value = node.onExhaustedTarget;
+      if (node.onExhaustedTarget && exhTargetSelect) exhTargetSelect.value = node.onExhaustedTarget;
 
-      exhSelect.addEventListener('change', () => {
+      exhSelect?.addEventListener('change', () => {
         node.onExhausted = exhSelect.value;
-        exhTargetGroup.style.display = node.onExhausted === 'goto' ? 'flex' : 'none';
+        if (exhTargetGroup) exhTargetGroup.style.display = node.onExhausted === 'goto' ? 'flex' : 'none';
         this.onFlowMutated();
       });
-      exhTargetSelect.addEventListener('change', () => {
+      exhTargetSelect?.addEventListener('change', () => {
         node.onExhaustedTarget = exhTargetSelect.value || null;
         this.onFlowMutated();
       });
 
-      this.container.querySelector('#btnAddBranch').addEventListener('click', () => {
+      this.container.querySelector('#btnAddBranch')?.addEventListener('click', () => {
         const otherNodes = Object.keys(this.flow.nodes).filter((id) => id !== node.id);
         const to = otherNodes[0] || null;
         const e = createEdge({ to, label: 'new branch', condition: { type: 'contains', value: '' } });
