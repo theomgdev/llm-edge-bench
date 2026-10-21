@@ -3,7 +3,7 @@
  * Ordered progression from simple atomic checks to multi-turn ReAct and adversarial defense.
  */
 
-import { createFlow, createNode, createEdge } from '../../core/engine.js';
+import { createFlow, createNode, createEdge } from '../core/engine.js';
 
 export function getTemplates() {
   return [

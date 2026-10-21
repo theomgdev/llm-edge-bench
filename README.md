@@ -2,6 +2,12 @@
 
 > **Interactive Branching Graph Workbench for LLM Decision Trees, Recovery Loops & Multi-Turn State Evals.**
 
+[![CI](https://github.com/theomgdev/llm-edge-bench/actions/workflows/ci.yml/badge.svg)](https://github.com/theomgdev/llm-edge-bench/actions/workflows/ci.yml)
+[![GitHub Pages](https://github.com/theomgdev/llm-edge-bench/actions/workflows/deploy-pages.yml/badge.svg)](https://theomgdev.github.io/llm-edge-bench/)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+🌐 **Live Demo**: [https://theomgdev.github.io/llm-edge-bench/](https://theomgdev.github.io/llm-edge-bench/)
+
 ![LLM Edge Bench Screenshot](docs/assets/hero.png)
 
 Most LLM benchmarks test single-turn isolation: *Ask Question → Get Answer → Grade 0/1*.  

@@ -3,8 +3,8 @@
  * Wires GraphView, InspectorView, ConsoleView, LLMClient, and storage.
  */
 
-import { LLMClient } from '../../core/client.js';
-import { runFlow, runBatch, validateFlow, createFlow, createNode, createEdge, summarize } from '../../core/engine.js';
+import { LLMClient } from '../core/client.js';
+import { runFlow, runBatch, validateFlow, createFlow, createNode, createEdge, summarize } from '../core/engine.js';
 import { GraphView } from './graph.js';
 import { InspectorView } from './inspector.js';
 import { ConsoleView } from './console-view.js';
@@ -211,13 +211,17 @@ class App {
   }
 
   async #checkServerConfig() {
+    this.hasProxyServer = false;
     try {
       const res = await fetch('/api/config');
       if (res.ok) {
+        this.hasProxyServer = true;
         const data = await res.json();
         if (data.serverBaseUrl && !this.apiBaseUrl.value) this.apiBaseUrl.value = data.serverBaseUrl;
       }
-    } catch { /* server proxy optional */ }
+    } catch {
+      this.hasProxyServer = false;
+    }
   }
 
   // =========================================================================
@@ -292,7 +296,7 @@ class App {
       baseUrl,
       apiKey,
       model,
-      proxy: '/api/llm', // proxies via local server to bypass CORS & handle timeouts
+      proxy: this.hasProxyServer ? '/api/llm' : null,
       timeoutMs: 120000,
     });
 
@@ -411,7 +415,7 @@ class App {
 
       const targets = models.map((m) => ({
         label: m,
-        client: new LLMClient({ baseUrl, apiKey, model: m, proxy: '/api/llm' }),
+        client: new LLMClient({ baseUrl, apiKey, model: m, proxy: this.hasProxyServer ? '/api/llm' : null }),
       }));
 
       const total = targets.length * repeats;
@@ -649,7 +653,7 @@ class App {
       const baseUrl = this.apiBaseUrl.value.trim();
       const apiKey = this.apiKey.value.trim();
       if (!baseUrl) return alert('Enter base URL first.');
-      const client = new LLMClient({ baseUrl, apiKey, proxy: '/api/llm' });
+      const client = new LLMClient({ baseUrl, apiKey, proxy: this.hasProxyServer ? '/api/llm' : null });
       try {
         const models = await client.listModels();
         this.modelsDataList.innerHTML = models.map((m) => `<option value="${escapeAttr(m)}">`).join('');
