@@ -4,8 +4,8 @@
  * fallbacks, and multi-condition rules.
  */
 
-import { CONDITION_TYPES, NUMERIC_OPS, NUMERIC_WHICH } from '../../core/matchers.js';
-import { createEdge, nodeLabel } from '../../core/engine.js';
+import { CONDITION_TYPES, NUMERIC_OPS, NUMERIC_WHICH } from '../core/matchers.js';
+import { createEdge, nodeLabel } from '../core/engine.js';
 
 export class InspectorView {
   /**

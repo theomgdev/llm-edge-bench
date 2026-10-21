@@ -10,8 +10,8 @@
  *   - SVG cubic bezier curves with directional arrows & condition badges
  */
 
-import { describeCondition } from '../../core/matchers.js';
-import { nodeLabel } from '../../core/engine.js';
+import { describeCondition } from '../core/matchers.js';
+import { nodeLabel } from '../core/engine.js';
 
 export class GraphView {
   /**
